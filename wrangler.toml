@@ -1,0 +1,28 @@
+name = "w2aw-cache-worker"
+main = "workers/cache-worker.ts"
+compatibility_date = "2024-01-01"
+
+# Use the environment variable from .env.local
+# The actual value will be provided at runtime
+[vars]
+# In production, this will be replaced with the deployed URL
+# In development, it will use NEXTAUTH_URL from .env.local
+
+[env.development]
+# This uses the NEXTAUTH_URL from .env.local (http://localhost:3000)
+
+[env.production]
+# For production deployments
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "w2aw-cache"
+preview_bucket_name = "w2aw-cache-preview"
+
+[build]
+command = "npm run build"
+watch_dir = "workers"
+
+[site]
+bucket = "./public"
+

@@ -12,6 +12,12 @@
 
 # testing
 /coverage
+# Uncomment the next line if you want to ignore test files
+#/__tests__/
+jest.config.js
+jest.setup.js
+*.test.js
+*.spec.js
 
 # next.js
 /.next/
@@ -19,6 +25,15 @@
 
 # production
 /build
+
+# temp files
+/tmp/
+*.bak
+*.tmp
+*.swp
+*.swo
+next-app.pid
+*.pid
 
 # misc
 .DS_Store
@@ -39,3 +54,16 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# database
+*.sqlite
+*.sqlite3
+*.db
+*.sql
+*.dump
+
+# docker
+docker-compose.override.yml
+
+# workers
+/workers/dist/

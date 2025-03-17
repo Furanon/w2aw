@@ -1,0 +1,39 @@
+{
+  "version": 2,
+  "buildCommand": "next build",
+  "devCommand": "next dev",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "regions": ["sin1"],
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "development": true,
+      "production": false
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/edge/maintenance",
+      "schedule": "0 0 * * *"
+    }
+  ],
+  "functions": {
+    "app/api/edge/**/*": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  },
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    }
+  ]
+}
+
