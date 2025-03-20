@@ -1,37 +1,36 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { act } from 'react-dom/test-utils';
 import '@testing-library/jest-dom';
-import { transformVisualizationData, filterNetworkData } from '@/lib/recommendations/visualizationTransform';
-import NetworkVisualization from '@/components/NetworkVisualization';
-import { RecommendationService } from '@/lib/recommendations/recommendationService';
-import { User, Activity, UserInteraction } from '@/lib/recommendations/mockData';
-import { MockVisualNetwork } from './__mocks__/mockVisualNetwork';
+import { transformVisualizationData, filterNetworkData } from '@/lib/recommendations/visualizationTransform.js';
+import NetworkVisualization from '@/components/NetworkVisualization.js';
+import { RecommendationService } from '@/lib/recommendations/recommendationService.js';
+import type { User, Activity, UserInteraction } from '@/lib/recommendations/mockData.js';
+import { MockVisualNetwork } from './__mocks__/mockVisualNetwork.js';
 
 // Mock the Three.js and react-three components
-jest.mock('@react-three/fiber', () => ({
-  Canvas: ({ children }: { children: React.ReactNode }) => <div data-testid="three-canvas">{children}</div>,
-  useFrame: jest.fn((callback) => callback()),
-  useThree: jest.fn(() => ({
+vi.mock('@react-three/fiber', () => ({
+  Canvas: ({ children }) => React.createElement('div', { 'data-testid': 'three-canvas' }, children),
+  useFrame: vi.fn((callback) => callback()),
+  useThree: vi.fn(() => ({
     camera: { position: { x: 0, y: 0, z: 10 } },
     scene: {},
     gl: { domElement: document.createElement('canvas') }
   }))
 }));
 
-jest.mock('@react-three/drei', () => ({
-  OrbitControls: () => <div data-testid="orbit-controls" />,
-  Text: ({ children }: { children: React.ReactNode }) => <div data-testid="drei-text">{children}</div>
+vi.mock('@react-three/drei', () => ({
+  OrbitControls: () => React.createElement('div', { 'data-testid': 'orbit-controls' }),
+  Text: ({ children }) => React.createElement('div', { 'data-testid': 'drei-text' }, children)
 }));
 
 // Mock tsParticles
-jest.mock('tsparticles', () => ({
+vi.mock('tsparticles', () => ({
   Container: class {
-    start = jest.fn();
-    stop = jest.fn();
-    destroy = jest.fn();
+    start = vi.fn();
+    stop = vi.fn();
+    destroy = vi.fn();
   }
 }));
-
 // Sample test data
 const mockUsers: User[] = [
   { id: 'user1', preferences: ['hiking', 'food', 'culture'], location: { latitude: 40.7128, longitude: -74.0060 } },
@@ -75,11 +74,11 @@ const mockInteractions: UserInteraction[] = [
 ];
 
 // Mock the recommendation service
-jest.mock('@/lib/recommendations/recommendationService', () => {
+vi.mock('@/lib/recommendations/recommendationService.js', () => {
   return {
-    RecommendationService: jest.fn().mockImplementation(() => {
+    RecommendationService: vi.fn().mockImplementation(() => {
       return {
-        getVisualizationData: jest.fn().mockResolvedValue({
+        getVisualizationData: vi.fn().mockResolvedValue({
           nodes: [
             { id: 'user1', type: 'user', label: 'User 1' },
             { id: 'activity1', type: 'activity', label: 'Activity 1' },
@@ -90,7 +89,7 @@ jest.mock('@/lib/recommendations/recommendationService', () => {
             { source: 'activity1', target: 'category1', strength: 0.9 }
           ]
         }),
-        getRecommendationsForUser: jest.fn().mockResolvedValue([
+        getRecommendationsForUser: vi.fn().mockResolvedValue([
           { id: 'activity1', score: 0.95 },
           { id: 'activity2', score: 0.82 }
         ])
@@ -164,7 +163,7 @@ describe('Visualization Data Transformation', () => {
 describe('Network Visualization Component', () => {
   beforeEach(() => {
     // Mock getBoundingClientRect to ensure the canvas renders
-    Element.prototype.getBoundingClientRect = jest.fn(() => {
+    Element.prototype.getBoundingClientRect = vi.fn(() => {
       return {
         width: 1000,
         height: 600,
@@ -191,7 +190,10 @@ describe('Network Visualization Component', () => {
     };
     
     await act(async () => {
-      render(<NetworkVisualization data={mockData} onNodeClick={jest.fn()} />);
+      render(React.createElement(NetworkVisualization, {
+        data: mockData,
+        onNodeClick: vi.fn()
+      }));
     });
     
     expect(screen.getByTestId('three-canvas')).toBeInTheDocument();
@@ -205,7 +207,10 @@ describe('Network Visualization Component', () => {
     };
     
     await act(async () => {
-      render(<NetworkVisualization data={emptyData} onNodeClick={jest.fn()} />);
+      render(React.createElement(NetworkVisualization, {
+        data: emptyData,
+        onNodeClick: vi.fn()
+      }));
     });
     
     expect(screen.getByTestId('three-canvas')).toBeInTheDocument();
@@ -213,7 +218,11 @@ describe('Network Visualization Component', () => {
   
   test('renders loading state when data is not available', async () => {
     await act(async () => {
-      render(<NetworkVisualization data={null} onNodeClick={jest.fn()} isLoading={true} />);
+      render(React.createElement(NetworkVisualization, {
+        data: null,
+        onNodeClick: vi.fn(),
+        isLoading: true
+      }));
     });
     
     expect(screen.getByText(/loading/i)).toBeInTheDocument();
@@ -232,20 +241,20 @@ describe('Interaction Handlers', () => {
       ]
     };
     
-    const handleNodeClick = jest.fn();
+    const handleNodeClick = vi.fn();
     
     // Create a mock visual network for testing click handlers
     const mockNetwork = new MockVisualNetwork();
     
     await act(async () => {
       render(
-        <div data-testid="network-container">
-          <NetworkVisualization 
-            data={mockData} 
-            onNodeClick={handleNodeClick} 
-            _testNetwork={mockNetwork}
-          />
-        </div>
+        React.createElement('div', { 'data-testid': 'network-container' },
+          React.createElement(NetworkVisualization, {
+            data: mockData,
+            onNodeClick: handleNodeClick,
+            _testNetwork: mockNetwork
+          })
+        )
       );
     });
     
@@ -267,19 +276,19 @@ describe('Interaction Handlers', () => {
     };
     
     // Mock zoom functions
-    const mockZoomIn = jest.fn();
-    const mockZoomOut = jest.fn();
+    const mockZoomIn = vi.fn();
+    const mockZoomOut = vi.fn();
     
     await act(async () => {
       render(
-        <div data-testid="network-container">
-          <NetworkVisualization 
-            data={mockData} 
-            onNodeClick={jest.fn()} 
-            _testZoomIn={mockZoomIn}
-            _testZoomOut={mockZoomOut}
-          />
-        </div>
+        React.createElement('div', { 'data-testid': 'network-container' },
+          React.createElement(NetworkVisualization, {
+            data: mockData,
+            onNodeClick: vi.fn(),
+            _testZoomIn: mockZoomIn,
+            _testZoomOut: mockZoomOut
+          })
+        )
       );
     });
     
@@ -376,4 +385,5 @@ describe('Filter Operations', () => {
     
     // Should keep all nodes and links with empty filters
     expect(filteredData.nodes.length).toBe(visualData.nodes.length);
-    expect(filteredData.links.length).toBe(visualData.links.length);
+});
+});

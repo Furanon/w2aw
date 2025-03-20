@@ -9,8 +9,8 @@ export enum AI_JOB_TYPES {
   MODEL_OPTIMIZATION = 'MODEL_OPTIMIZATION',
 }
 
-// Import TensorFlow Lite
-import * as tflite from '@tensorflow/tfjs-tflite';
+// Import MLC AI Web Runtime
+import { WebGraphModule } from '@mlc-ai/web-runtime';
 
 // Interface for AI job payloads
 interface AIJobBase {
@@ -51,14 +51,14 @@ async function handleModelInference(job: ModelInferenceJob) {
   console.log(`Starting model inference job ${job.jobId} with model ${job.modelPath}`);
   
   try {
-    // Load the TFLite model
-    const tfliteModel = await tflite.loadTFLiteModel(job.modelPath);
+    // Load the TVM model
+    const model = await WebGraphModule.load(job.modelPath);
     
     // Process input data
     const input = job.inputData;
     
     // Run inference
-    const output = await tfliteModel.predict(input);
+    const output = await model.run(input);
     
     console.log(`Successfully completed inference job ${job.jobId}`);
     return {
@@ -112,14 +112,14 @@ async function handlePrediction(job: PredictionJob) {
   console.log(`Starting prediction job ${job.jobId} with model ${job.modelPath}`);
   
   try {
-    // Load the TFLite model
-    const tfliteModel = await tflite.loadTFLiteModel(job.modelPath);
+    // Load the TVM model
+    const model = await WebGraphModule.load(job.modelPath);
     
     // Process input data
     const input = job.inputData;
     
     // Run prediction
-    const predictions = await tfliteModel.predict(input);
+    const predictions = await model.run(input);
     
     console.log(`Successfully completed prediction job ${job.jobId}`);
     return {

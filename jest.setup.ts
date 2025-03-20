@@ -1,5 +1,5 @@
-import React from 'react';
-import '@testing-library/jest-dom';
+import React from "react";
+import "@testing-library/jest-dom";
 
 // Type definitions for global mocks
 declare global {
@@ -13,8 +13,8 @@ declare global {
 }
 
 // Mock for three.js related modules
-jest.mock('three', () => {
-  const actualThree = jest.requireActual('three');
+jest.mock("three", () => {
+  const actualThree = jest.requireActual("three");
   
   return {
     ...actualThree,
@@ -23,7 +23,7 @@ jest.mock('three', () => {
       setPixelRatio: jest.fn(),
       render: jest.fn(),
       shadowMap: {},
-      domElement: document.createElement('canvas'),
+      domElement: document.createElement("canvas"),
       dispose: jest.fn(),
     })),
     Scene: jest.fn().mockImplementation(() => ({
@@ -54,36 +54,30 @@ jest.mock('three', () => {
 });
 
 // Mock for @react-three/fiber
-jest.mock('@react-three/fiber', () => {
+jest.mock("@react-three/fiber", () => {
   return {
-    Canvas: ({ children }: { children: React.ReactNode }) => (
-      <div data-testid="mock-canvas">{children}</div>
-    ),
+    Canvas: ({ children }) => React.createElement("div", { "data-testid": "mock-canvas" }, children),
     useThree: jest.fn().mockReturnValue({
       camera: { position: { set: jest.fn() } },
-      gl: { domElement: document.createElement('canvas') },
+      gl: { domElement: document.createElement("canvas") },
       scene: { add: jest.fn(), children: [] },
     }),
-    useFrame: jest.fn().mockImplementation((callback) => {}),
+    useFrame: jest.fn(),
   };
 });
 
 // Mock for @react-three/drei
-jest.mock('@react-three/drei', () => {
+jest.mock("@react-three/drei", () => {
   return {
-    OrbitControls: () => <div data-testid="mock-orbit-controls" />,
-    Text: ({ children, ...props }: { children: React.ReactNode }) => (
-      <div data-testid="mock-text" {...props}>
-        {children}
-      </div>
-    ),
-    Sphere: (props: any) => <div data-testid="mock-sphere" {...props} />,
-    Line: (props: any) => <div data-testid="mock-line" {...props} />,
+    OrbitControls: () => React.createElement("div", { "data-testid": "mock-orbit-controls" }),
+    Text: ({ children, ...props }) => React.createElement("div", { "data-testid": "mock-text", ...props }, children),
+    Sphere: (props) => React.createElement("div", { "data-testid": "mock-sphere", ...props }),
+    Line: (props) => React.createElement("div", { "data-testid": "mock-line", ...props }),
   };
 });
 
 // Mock for tsparticles
-jest.mock('tsparticles', () => {
+jest.mock("tsparticles", () => {
   return {
     loadFull: jest.fn().mockResolvedValue(undefined),
     Engine: {
@@ -93,17 +87,18 @@ jest.mock('tsparticles', () => {
 });
 
 // Mock for react-tsparticles
-jest.mock('react-tsparticles', () => {
+jest.mock("react-tsparticles", () => {
   return {
     __esModule: true,
-    default: ({ options }: { options: any }) => (
-      <div data-testid="mock-particles" data-options={JSON.stringify(options)} />
-    ),
+    default: ({ options }) => React.createElement("div", {
+      "data-testid": "mock-particles",
+      "data-options": JSON.stringify(options),
+    }),
   };
 });
 
 // Mock for Next.js router
-jest.mock('next/navigation', () => ({
+jest.mock("next/navigation", () => ({
   useRouter: jest.fn().mockReturnValue({
     push: jest.fn(),
     replace: jest.fn(),
@@ -111,17 +106,16 @@ jest.mock('next/navigation', () => ({
     back: jest.fn(),
     forward: jest.fn(),
     refresh: jest.fn(),
-    pathname: '/',
+    pathname: "/",
     query: {},
   }),
-  usePathname: jest.fn().mockReturnValue('/'),
+  usePathname: jest.fn().mockReturnValue("/"),
   useSearchParams: jest.fn().mockReturnValue(new URLSearchParams()),
 }));
 
 // DOM environment setup
-if (typeof window !== 'undefined') {
-  // IntersectionObserver mock
-  Object.defineProperty(window, 'IntersectionObserver', {
+if (typeof window !== "undefined") {
+  Object.defineProperty(window, "IntersectionObserver", {
     writable: true,
     value: jest.fn().mockImplementation(() => ({
       observe: jest.fn(),
@@ -130,8 +124,7 @@ if (typeof window !== 'undefined') {
     })),
   });
 
-  // ResizeObserver mock
-  Object.defineProperty(window, 'ResizeObserver', {
+  Object.defineProperty(window, "ResizeObserver", {
     writable: true,
     value: jest.fn().mockImplementation(() => ({
       observe: jest.fn(),
@@ -140,8 +133,7 @@ if (typeof window !== 'undefined') {
     })),
   });
 
-  // matchMedia mock
-  Object.defineProperty(window, 'matchMedia', {
+  Object.defineProperty(window, "matchMedia", {
     writable: true,
     value: jest.fn().mockImplementation(query => ({
       matches: false,
@@ -161,8 +153,7 @@ global.fetch = jest.fn().mockImplementation(() =>
   Promise.resolve({
     ok: true,
     json: () => Promise.resolve({}),
-    text: () => Promise.resolve(''),
+    text: () => Promise.resolve(""),
     blob: () => Promise.resolve(new Blob()),
   })
 ) as jest.Mock;
-

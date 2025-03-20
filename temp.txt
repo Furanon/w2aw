@@ -1,0 +1,79 @@
+import { describe, test, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { useVisualization } from "@context/VisualizationContext";
+
+// Mock Three.js with minimal implementation
+vi.mock("three", () => {
+  const mockRenderer = {
+    setSize: vi.fn(),
+    render: vi.fn(),
+    domElement: document.createElement("canvas"),
+    dispose: vi.fn(),
+  };
+
+  const createVector3 = () => ({
+    x: 0,
+    y: 0,
+    z: 0,
+    set: vi.fn(),
+    clone: vi.fn().mockReturnThis(),
+    normalize: vi.fn().mockReturnThis(),
+    multiplyScalar: vi.fn().mockReturnThis(),
+  });
+
+  const mockScene = {
+    add: vi.fn(),
+    children: [],
+    remove: vi.fn(),
+  };
+
+  const mockCamera = {
+    position: createVector3(),
+    lookAt: vi.fn(),
+    updateProjectionMatrix: vi.fn(),
+    aspect: 1,
+  };
+
+  return {
+    WebGLRenderer: vi.fn(() => mockRenderer),
+    Scene: vi.fn(() => mockScene),
+    PerspectiveCamera: vi.fn(() => mockCamera),
+    Vector3: vi.fn(() => createVector3()),
+    Vector2: vi.fn(() => ({ x: 0, y: 0 })),
+    Raycaster: vi.fn(() => ({ 
+      setFromCamera: vi.fn(), 
+      intersectObjects: vi.fn(() => []) 
+    })),
+    SphereGeometry: vi.fn(),
+    MeshPhongMaterial: vi.fn(),
+    MeshBasicMaterial: vi.fn(),
+    Mesh: vi.fn(() => ({
+      position: createVector3(),
+      scale: createVector3(),
+      userData: {},
+      name: "",
+    })),
+    Group: vi.fn(() => ({
+      name: "",
+      add: vi.fn(),
+      children: [],
+    })),
+    BufferGeometry: vi.fn(() => ({
+      setFromPoints: vi.fn().mockReturnThis(),
+    })),
+    LineBasicMaterial: vi.fn(),
+    Line: vi.fn(() => ({
+      name: "",
+    })),
+    AmbientLight: vi.fn(() => ({
+      position: createVector3(),
+    })),
+    PointLight: vi.fn(() => ({
+      position: createVector3(),
+    })),
+    __esModule: true,
+  };
+});
+
+// Keep the rest of the file the same...
+
