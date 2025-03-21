@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@cloudflare/workers-types": "^4.20240312.0",
+    "@floating-ui/react": "^0.26.28",
     "@googlemaps/google-maps-services-js": "^3.4.0",
     "@heroicons/react": "^2.2.0",
     "@mlc-ai/web-runtime": "^0.18.0-dev2",

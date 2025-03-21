@@ -1,234 +1,339 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
-import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import { VisualizationNode } from '@/types/visualization';
+import { useEffect, useRef, useCallback, useState } from "react";
+import * as THREE from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
+import gsap from "gsap";
 
+// Types for visualization data
+interface VisualizationNode {
+  id: string;
+  name: string;
+  lat?: number;
+  lng?: number;
+  position?: [number, number, number];
+  color?: string | number;
+  size?: number;
+  type?: string;
+  metadata?: Record<string, any>;
+}
+
+interface VisualizationConnection {
+  id: string;
+  source: string;
+  target: string;
+  weight?: number;
+  color?: string | number;
+  metadata?: Record<string, any>;
+}
+
+// Types for continent visualization
+interface ContinentPoint {
+  lat: number;
+  lng: number;
+}
+
+interface ContinentTriangle {
+  points: [ContinentPoint, ContinentPoint, ContinentPoint];
+}
+
+interface ContinentData {
+  id: string;
+  name: string;
+  triangles: ContinentTriangle[];
+  properties?: {
+    color?: string;
+    opacity?: number;
+    weight?: number;
+  };
+}
+
+// Shader uniforms interface
+interface ShaderUniforms {
+  time: { value: number };
+  color: { value: THREE.Color };
+  baseOpacity: { value: number };
+  opacity: { value: number };
+  pulseScale: { value: number };
+  pulseSpeed: { value: number };
+}
+
+// Options for the hook
 interface GlobeVisualizationOptions {
-  nodes: VisualizationNode[];
-  connections: any[];
+  nodes?: VisualizationNode[];
+  connections?: VisualizationConnection[];
   radius?: number;
   nodeSize?: number;
   detail?: number;
   enableRotation?: boolean;
-  standalone?: boolean;
+  autoRotationSpeed?: number;
+  showContinents?: boolean;
+  continentOpacity?: number;
+  glowColor?: string | number;
+  backgroundColor?: string | number;
 }
 
-export function useGlobeVisualization(
+// Return type for the hook
+interface GlobeVisualizationReturn {
+  isInitialized: boolean;
+  scene: THREE.Scene;
+  camera: THREE.PerspectiveCamera | undefined;
+  renderer: THREE.WebGLRenderer | undefined;
+  controls: OrbitControls | undefined;
+  globe: THREE.Mesh | undefined;
+  nodeGroup: THREE.Group;
+  continentGroup: THREE.Group;
+  connectionGroup: THREE.Group;
+  zoomToNode: (nodeId: string) => void;
+  rotateToLatLong: (lat: number, lng: number, distance?: number) => void;
+  setCameraPosition: (position: THREE.Vector3, target: THREE.Vector3, animate?: boolean) => void;
+  updateRotation: (enable: boolean) => void;
+  latLngToCartesian: (lat: number, lng: number, radius: number) => [number, number, number];
+}
+
+// Utility function for converting lat/lng to 3D coordinates
+const latLngToCartesian = (lat: number, lng: number, radius: number): [number, number, number] => {
+  const phi = (90 - lat) * (Math.PI / 180);
+  const theta = (lng + 180) * (Math.PI / 180);
+  const x = -(radius * Math.sin(phi) * Math.cos(theta));
+  const y = radius * Math.cos(phi);
+  const z = radius * Math.sin(phi) * Math.sin(theta);
+  return [x, y, z];
+};
+
+export const useGlobeVisualization = (
   containerRef: React.RefObject<HTMLDivElement>,
   options: GlobeVisualizationOptions
-) {
+): GlobeVisualizationReturn => {
+  // Extract options with defaults
   const {
     nodes = [],
+    connections = [],
     radius = 100,
     nodeSize = 2,
     detail = 64,
     enableRotation = true,
-    standalone = false
+    autoRotationSpeed = 0.5,
+    showContinents = true,
+    continentOpacity = 0.3,
+    glowColor = 0x2233ff,
+    backgroundColor = 0x000000
   } = options;
 
-  const sceneRef = useRef<THREE.Scene>();
+  // Scene and rendering refs
+  const sceneRef = useRef<THREE.Scene>(new THREE.Scene());
   const cameraRef = useRef<THREE.PerspectiveCamera>();
   const rendererRef = useRef<THREE.WebGLRenderer>();
   const controlsRef = useRef<OrbitControls>();
-  const frameIdRef = useRef<number>();
-  const globeRef = useRef<THREE.Mesh>();
 
+  // Visualization element refs
+  const globeRef = useRef<THREE.Mesh>();
+  const nodeGroupRef = useRef<THREE.Group>(new THREE.Group());
+  const connectionGroupRef = useRef<THREE.Group>(new THREE.Group());
+  const continentGroupRef = useRef<THREE.Group>(new THREE.Group());
+
+  // Animation and cleanup refs
+  const frameIdRef = useRef<number>();
+  const materialsRef = useRef<THREE.Material[]>([]);
+  const geometriesRef = useRef<THREE.BufferGeometry[]>([]);
+
+  // State
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Initialize the scene
-  const initScene = useCallback(() => {
+  // Calculate distance-based opacity for continents
+  const calculateDistanceBasedOpacity = useCallback(
+    (cameraPosition: THREE.Vector3): number => {
+      const distance = cameraPosition.length();
+      const minDistance = radius * 1.5;
+      const maxDistance = radius * 4;
+      const opacity = 1 - THREE.MathUtils.smoothstep(distance, minDistance, maxDistance);
+      return THREE.MathUtils.clamp(opacity * continentOpacity, 0.1, 0.5);
+    },
+    [radius, continentOpacity]
+  );
+
+  // Camera position setter with animation
+  const setCameraPosition = useCallback(
+    (position: THREE.Vector3, target: THREE.Vector3 = new THREE.Vector3(), animate = true) => {
+      if (!cameraRef.current || !controlsRef.current) return;
+
+      if (animate) {
+        gsap.to(cameraRef.current.position, {
+          duration: 1,
+          x: position.x,
+          y: position.y,
+          z: position.z,
+          ease: "power2.inOut"
+        });
+
+        gsap.to(controlsRef.current.target, {
+          duration: 1,
+          x: target.x,
+          y: target.y,
+          z: target.z,
+          ease: "power2.inOut",
+          onUpdate: () => controlsRef.current?.update()
+        });
+      } else {
+        cameraRef.current.position.copy(position);
+        controlsRef.current.target.copy(target);
+        controlsRef.current.update();
+      }
+    },
+    []
+  );
+
+  // Navigation helpers
+  const rotateToLatLong = useCallback(
+    (lat: number, lng: number, distance = radius * 2) => {
+      const [x, y, z] = latLngToCartesian(lat, lng, distance);
+      setCameraPosition(
+        new THREE.Vector3(x, y, z),
+        new THREE.Vector3(0, 0, 0),
+        true
+      );
+    },
+    [radius, setCameraPosition]
+  );
+
+  const zoomToNode = useCallback(
+    (nodeId: string) => {
+      const node = nodeGroupRef.current?.children.find(
+        (child) => child.userData?.id === nodeId
+      );
+
+      if (node) {
+        const nodePosition = node.position.clone();
+        const distance = radius * 1.5;
+        const direction = nodePosition.clone().normalize();
+        const cameraPosition = direction.multiplyScalar(distance);
+        setCameraPosition(cameraPosition, nodePosition, true);
+      }
+    },
+    [radius, setCameraPosition]
+  );
+
+  const updateRotation = useCallback((enable: boolean) => {
+    if (controlsRef.current) {
+      controlsRef.current.autoRotate = enable;
+    }
+  }, []);
+
+  // Initialize scene
+  useEffect(() => {
     if (!containerRef.current) return;
 
-    // Create scene
-    const scene = new THREE.Scene();
-    sceneRef.current = scene;
-
-    // Create camera
-    const camera = new THREE.PerspectiveCamera(
-      45,
-      containerRef.current.clientWidth / containerRef.current.clientHeight,
-      0.1,
-      1000
-    );
+    // Setup camera
+    const aspect = containerRef.current.clientWidth / containerRef.current.clientHeight;
+    const camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 1000);
     camera.position.z = radius * 2.5;
     cameraRef.current = camera;
 
-    // Create renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    // Setup renderer
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: true,
+      powerPreference: "high-performance"
+    });
     renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setClearColor(backgroundColor as number, 1);
     containerRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // Create controls
+    // Setup controls
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.rotateSpeed = 0.5;
-    controls.enableZoom = true;
-    controls.minDistance = radius * 1.5;
-    controls.maxDistance = radius * 4;
+    controls.dampingFactor = 0.1;
+    controls.rotateSpeed = 0.6;
+    controls.zoomSpeed = 0.8;
+    controls.minDistance = radius * 1.2;
+    controls.maxDistance = radius * 3.5;
+    controls.autoRotate = enableRotation;
+    controls.autoRotateSpeed = autoRotationSpeed;
     controlsRef.current = controls;
 
-    // Create globe
-    const globeGeometry = new THREE.SphereGeometry(radius, detail, detail);
-    const globeMaterial = new THREE.MeshPhongMaterial({
-      color: 0x093766,
-      transparent: true,
-      opacity: 0.8,
-      wireframe: true
-    });
-    const globe = new THREE.Mesh(globeGeometry, globeMaterial);
-    globeRef.current = globe;
-    scene.add(globe);
-
-    // Add ambient light
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-    scene.add(ambientLight);
-
-    // Add point light
+    // Add lights
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     const pointLight = new THREE.PointLight(0xffffff, 1);
     pointLight.position.set(radius * 2, radius * 2, radius * 2);
-    scene.add(pointLight);
+    sceneRef.current.add(ambientLight);
+    sceneRef.current.add(pointLight);
+
+    // Create globe mesh
+    const globeGeometry = new THREE.SphereGeometry(radius, detail, detail);
+    const globeMaterial = new THREE.MeshPhongMaterial({
+      color: glowColor as number,
+      transparent: true,
+      opacity: 0.2,
+      shininess: 0.7
+    });
+    const globe = new THREE.Mesh(globeGeometry, globeMaterial);
+    sceneRef.current.add(globe);
+    globeRef.current = globe;
+
+    // Store for cleanup
+    geometriesRef.current.push(globeGeometry);
+    materialsRef.current.push(globeMaterial);
+
+    // Add groups to scene
+    sceneRef.current.add(nodeGroupRef.current);
+    sceneRef.current.add(connectionGroupRef.current);
+    sceneRef.current.add(continentGroupRef.current);
 
     setIsInitialized(true);
-  }, [radius, detail, containerRef]);
 
-  // Handle window resize
-  const handleResize = useCallback(() => {
-    if (!containerRef.current || !cameraRef.current || !rendererRef.current) return;
+    // Handle resize
+    const handleResize = () => {
+      if (!containerRef.current || !camera || !renderer) return;
+      const width = containerRef.current.clientWidth;
+      const height = containerRef.current.clientHeight;
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height);
+    };
 
-    const width = containerRef.current.clientWidth;
-    const height = containerRef.current.clientHeight;
+    window.addEventListener("resize", handleResize);
 
-    cameraRef.current.aspect = width / height;
-    cameraRef.current.updateProjectionMatrix();
+    // Animation loop
+    const animate = () => {
+      frameIdRef.current = requestAnimationFrame(animate);
+      controls.update();
 
-    rendererRef.current.setSize(width, height);
-  }, []);
+      // Update shader uniforms
+      const time = performance.now() * 0.001;
+      sceneRef.current.traverse((child) => {
+        if (
+          (child instanceof THREE.Mesh || child instanceof THREE.Line) &&
+          child.material instanceof THREE.ShaderMaterial &&
+          child.material.uniforms?.time
+        ) {
+          child.material.uniforms.time.value = time;
+        }
+      });
 
-  // Animation loop
-  const animate = useCallback(() => {
-    if (!sceneRef.current || !cameraRef.current || !rendererRef.current || !controlsRef.current) return;
-
-    frameIdRef.current = requestAnimationFrame(animate);
-
-    if (enableRotation && globeRef.current) {
-      globeRef.current.rotation.y += 0.001;
-    }
-
-    controlsRef.current.update();
-    rendererRef.current.render(sceneRef.current, cameraRef.current);
-  }, [enableRotation]);
-
-  // Initialize scene on mount
-  useEffect(() => {
-    initScene();
-    window.addEventListener('resize', handleResize);
+      renderer.render(sceneRef.current, camera);
+    };
+    animate();
 
     return () => {
-      window.removeEventListener('resize', handleResize);
       if (frameIdRef.current) {
         cancelAnimationFrame(frameIdRef.current);
       }
-      if (rendererRef.current && containerRef.current) {
-        containerRef.current.removeChild(rendererRef.current.domElement);
+      window.removeEventListener("resize", handleResize);
+
+      // Dispose of all materials and geometries
+      materialsRef.current.forEach((material) => material?.dispose());
+      geometriesRef.current.forEach((geometry) => geometry?.dispose());
+
+      if (containerRef.current && renderer.domElement) {
+        containerRef.current.removeChild(renderer.domElement);
       }
+      renderer.dispose();
     };
-  }, [initScene, handleResize]);
-
-  // Start animation when initialized
-  useEffect(() => {
-    if (isInitialized) {
-      animate();
-    }
-  }, [isInitialized, animate]);
-
-  // Update nodes
-  useEffect(() => {
-    if (!isInitialized || !sceneRef.current) return;
-
-    // Remove existing nodes
-    const existingNodesGroup = sceneRef.current.children.find(child => child.name === 'nodes-group');
-    if (existingNodesGroup) {
-      sceneRef.current.remove(existingNodesGroup);
-    }
-
-    // Create new nodes group
-    const nodesGroup = new THREE.Group();
-    nodesGroup.name = 'nodes-group';
-
-    // Add nodes
-    nodes.forEach(node => {
-      const geometry = new THREE.SphereGeometry(nodeSize, 16, 16);
-      const material = new THREE.MeshPhongMaterial({ 
-        color: node.color || 0x00ff00,
-        emissive: 0x222222
-      });
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.set(...node.position);
-      mesh.userData.nodeData = node;
-      nodesGroup.add(mesh);
-    });
-
-    sceneRef.current.add(nodesGroup);
-  }, [isInitialized, nodes, nodeSize]);
-
-  // Helper functions
-  const zoomToNode = useCallback((node: VisualizationNode) => {
-    if (!controlsRef.current || !cameraRef.current) return;
-
-    const targetPosition = new THREE.Vector3(...node.position);
-    const distance = radius * 1.75;
-
-    // Calculate camera position
-    const direction = targetPosition.normalize();
-    const cameraPosition = direction.multiplyScalar(distance);
-
-    // Animate camera movement
-    const duration = 1000;
-    const startPosition = cameraRef.current.position.clone();
-    const startTime = Date.now();
-
-    function updateCamera() {
-      const elapsed = Date.now() - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-
-      // Ease function
-      const t = progress < 0.5
-        ? 2 * progress * progress
-        : -1 + (4 - 2 * progress) * progress;
-
-      cameraRef.current!.position.lerpVectors(startPosition, cameraPosition, t);
-      controlsRef.current!.target.copy(targetPosition);
-      controlsRef.current!.update();
-
-      if (progress < 1) {
-        requestAnimationFrame(updateCamera);
-      }
-    }
-
-    updateCamera();
-  }, [radius]);
-
-  const rotateToLatLong = useCallback((lat: number, lng: number) => {
-    if (!globeRef.current) return;
-
-    const phi = (90 - lat) * (Math.PI / 180);
-    const theta = (lng + 180) * (Math.PI / 180);
-
-    globeRef.current.rotation.y = theta;
-    globeRef.current.rotation.x = phi;
-  }, []);
-
-  return {
-    isInitialized,
-    getScene: () => sceneRef.current,
-    getCamera: () => cameraRef.current,
-    getRenderer: () => rendererRef.current,
-    getControls: () => controlsRef.current,
-    zoomToNode,
-    rotateToLatLong
-  };
-}
-
+  }, [
+    radius,
+    detail,
+    enableRotation,
+    autoRotationSpeed,
+    backgroundColor,
+    glowColor
+  ]);

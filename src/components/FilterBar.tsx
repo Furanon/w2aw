@@ -1,99 +1,303 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, ReactNode, CSSProperties } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
-import { MdApartment, MdHouse, MdVilla, MdCabin, MdHotel } from 'react-icons/md';
-import { LuBedDouble } from 'react-icons/lu';
-import { TbBath } from 'react-icons/tb';
-import { IoFilterSharp } from 'react-icons/io5';
-import { motion } from 'framer-motion';
-import { cn } from '@/lib/utils';
+import { FaHome, FaHiking, FaSpa, FaUtensils, FaGlassCheers } from 'react-icons/fa';
+import { IoMdBed } from 'react-icons/io';
+import { MdNaturePeople, MdHotel, MdCabin } from 'react-icons/md';
+import { GiBowlOfRice, GiMountainCave } from 'react-icons/gi';
+import { RiRestaurantLine } from 'react-icons/ri';
+import { BiDrink } from 'react-icons/bi';
+import FilterSection from './FilterSection';
 
 type FilterOption = {
   id: string;
   label: string;
-  icon?: React.ReactNode;
+  icon?: ReactNode;
+  isParent?: boolean;
+  subcategories?: FilterOption[];
 };
 
-// Property type options
-const propertyTypes: FilterOption[] = [
-  { id: 'house', label: 'Houses', icon: <MdHouse size={20} /> },
-  { id: 'apartment', label: 'Apartments', icon: <MdApartment size={20} /> },
-  { id: 'villa', label: 'Villas', icon: <MdVilla size={20} /> },
-  { id: 'cabin', label: 'Cabins', icon: <MdCabin size={20} /> },
-  { id: 'hotel', label: 'Hotels', icon: <MdHotel size={20} /> },
+// Accommodation options with subcategories
+const accommodationOptions: FilterOption[] = [
+  { 
+    id: 'hotel', 
+    label: 'Hotels', 
+    icon: <MdHotel size={20} />,
+    isParent: true,
+    subcategories: [
+      { id: 'luxury_hotel', label: 'Luxury Hotels' },
+      { id: 'boutique_hotel', label: 'Boutique Hotels' },
+      { id: 'resort', label: 'Resorts' },
+      { id: 'business_hotel', label: 'Business Hotels' }
+    ]
+  },
+  { 
+    id: 'hostel', 
+    label: 'Hostels', 
+    icon: <IoMdBed size={20} />,
+    isParent: true,
+    subcategories: [
+      { id: 'backpacker_hostel', label: 'Backpacker Hostels' },
+      { id: 'boutique_hostel', label: 'Boutique Hostels' },
+      { id: 'party_hostel', label: 'Party Hostels' },
+      { id: 'family_hostel', label: 'Family Hostels' }
+    ]
+  },
+  { 
+    id: 'cabin', 
+    label: 'Cabins', 
+    icon: <MdCabin size={20} />,
+    isParent: true,
+    subcategories: [
+      { id: 'mountain_cabin', label: 'Mountain Cabins' },
+      { id: 'lake_cabin', label: 'Lake Cabins' },
+      { id: 'forest_cabin', label: 'Forest Cabins' },
+      { id: 'luxury_cabin', label: 'Luxury Cabins' }
+    ]
+  },
+  { 
+    id: 'camping', 
+    label: 'Camping', 
+    icon: <FaHome size={20} />,
+    isParent: true,
+    subcategories: [
+      { id: 'tent_camping', label: 'Tent Camping' },
+      { id: 'rv_camping', label: 'RV Camping' },
+      { id: 'glamping', label: 'Glamping' },
+      { id: 'beach_camping', label: 'Beach Camping' }
+    ]
+  }
 ];
 
-// Price range options
-const priceRanges: FilterOption[] = [
-  { id: 'price_0_500', label: 'Under $500' },
-  { id: 'price_500_1500', label: '$500 - $1,500' },
-  { id: 'price_1500_3000', label: '$1,500 - $3,000' },
-  { id: 'price_3000_5000', label: '$3,000 - $5,000' },
-  { id: 'price_5000_plus', label: '$5,000+' },
+// Nature & Adventure options with subcategories
+const natureAdventureOptions: FilterOption[] = [
+  { 
+    id: 'hiking', 
+    label: 'Hiking', 
+    icon: <FaHiking size={20} />,
+    isParent: true,
+    subcategories: [
+      { id: 'day_hike', label: 'Day Hikes' },
+      { id: 'mountain_trek', label: 'Mountain Treks' },
+      { id: 'nature_trail', label: 'Nature Trails' },
+      { id: 'jungle_trek', label: 'Jungle Treks' }
+    ]
+  },
+  { 
+    id: 'wildlife', 
+    label: 'Wildlife', 
+    icon: <MdNaturePeople size={20} />,
+    isParent: true,
+    subcategories: [
+      { id: 'safari', label: 'Safari' },
+      { id: 'bird_watching', label: 'Bird Watching' },
+      { id: 'whale_watching', label: 'Whale Watching' },
+      { id: 'wildlife_sanctuary', label: 'Wildlife Sanctuary' }
+    ]
+  },
+  { 
+    id: 'caves', 
+    label: 'Caves', 
+    icon: <GiMountainCave size={20} />,
+    isParent: true,
+    subcategories: [
+      { id: 'cave_tours', label: 'Cave Tours' },
+      { id: 'cave_diving', label: 'Cave Diving' },
+      { id: 'spelunking', label: 'Spelunking' },
+      { id: 'cave_climbing', label: 'Cave Climbing' }
+    ]
+  },
+  { 
+    id: 'beaches', 
+    label: 'Beaches', 
+    icon: <FaHiking size={20} />,
+    isParent: true,
+    subcategories: [
+      { id: 'sandy_beach', label: 'Sandy Beaches' },
+      { id: 'rocky_beach', label: 'Rocky Beaches' },
+      { id: 'private_beach', label: 'Private Beaches' },
+      { id: 'surf_beach', label: 'Surf Beaches' }
+    ]
+  }
 ];
 
-// Bedroom options
-const bedrooms: FilterOption[] = [
-  { id: 'beds_any', label: 'Any' },
-  { id: 'beds_1', label: '1+' },
-  { id: 'beds_2', label: '2+' },
-  { id: 'beds_3', label: '3+' },
-  { id: 'beds_4', label: '4+' },
-  { id: 'beds_5', label: '5+' },
+// Relax & Wellness options with subcategories
+const relaxWellnessOptions: FilterOption[] = [
+  { 
+    id: 'spa', 
+    label: 'Spa', 
+    icon: <FaSpa size={20} />,
+    isParent: true,
+    subcategories: [
+      { id: 'day_spa', label: 'Day Spa' },
+      { id: 'thermal_spa', label: 'Thermal Spa' },
+      { id: 'medical_spa', label: 'Medical Spa' },
+      { id: 'resort_spa', label: 'Resort Spa' }
+    ]
+  },
+  { 
+    id: 'massage', 
+    label: 'Massage', 
+    icon: <FaSpa size={20} />,
+    isParent: true,
+    subcategories: [
+      { id: 'thai_massage', label: 'Thai Massage' },
+      { id: 'swedish_massage', label: 'Swedish Massage' },
+      { id: 'hot_stone', label: 'Hot Stone' },
+      { id: 'aromatherapy', label: 'Aromatherapy' }
+    ]
+  },
+  { 
+    id: 'yoga', 
+    label: 'Yoga', 
+    icon: <FaSpa size={20} />,
+    isParent: true,
+    subcategories: [
+      { id: 'hatha_yoga', label: 'Hatha Yoga' },
+      { id: 'vinyasa_yoga', label: 'Vinyasa Yoga' },
+      { id: 'aerial_yoga', label: 'Aerial Yoga' },
+      { id: 'meditation_yoga', label: 'Meditation Yoga' }
+    ]
+  },
+  { 
+    id: 'meditation', 
+    label: 'Meditation', 
+    icon: <FaSpa size={20} />,
+    isParent: true,
+    subcategories: [
+      { id: 'guided_meditation', label: 'Guided Meditation' },
+      { id: 'zen_meditation', label: 'Zen Meditation' },
+      { id: 'mindfulness', label: 'Mindfulness' },
+      { id: 'transcendental', label: 'Transcendental' }
+    ]
+  }
 ];
 
-// Bathroom options
-const bathrooms: FilterOption[] = [
-  { id: 'baths_any', label: 'Any' },
-  { id: 'baths_1', label: '1+' },
-  { id: 'baths_2', label: '2+' },
-  { id: 'baths_3', label: '3+' },
-  { id: 'baths_4', label: '4+' },
+// Food options with subcategories
+const foodOptions: FilterOption[] = [
+  { 
+    id: 'restaurants', 
+    label: 'Restaurants', 
+    icon: <RiRestaurantLine size={20} />,
+    isParent: true,
+    subcategories: [
+      { id: 'fine_dining', label: 'Fine Dining' },
+      { id: 'casual_dining', label: 'Casual Dining' },
+      { id: 'family_style', label: 'Family Style' },
+      { id: 'buffet', label: 'Buffet' }
+    ]
+  },
+  { 
+    id: 'street_food', 
+    label: 'Street Food', 
+    icon: <FaUtensils size={20} />,
+    isParent: true,
+    subcategories: [
+      { id: 'food_stalls', label: 'Food Stalls' },
+      { id: 'food_trucks', label: 'Food Trucks' },
+      { id: 'night_market', label: 'Night Market' },
+      { id: 'hawker_center', label: 'Hawker Center' }
+    ]
+  },
+  { 
+    id: 'organic', 
+    label: 'Organic', 
+    icon: <GiBowlOfRice size={20} />,
+    isParent: true,
+    subcategories: [
+      { id: 'farm_to_table', label: 'Farm to Table' },
+      { id: 'organic_cafe', label: 'Organic Cafe' },
+      { id: 'vegan', label: 'Vegan' },
+      { id: 'vegetarian', label: 'Vegetarian' }
+    ]
+  },
+  { 
+    id: 'cooking_class', 
+    label: 'Cooking Class', 
+    icon: <FaUtensils size={20} />,
+    isParent: true,
+    subcategories: [
+      { id: 'local_cuisine', label: 'Local Cuisine' },
+      { id: 'pastry_baking', label: 'Pastry & Baking' },
+      { id: 'wine_pairing', label: 'Wine Pairing' },
+      { id: 'professional', label: 'Professional' }
+    ]
+  }
 ];
 
-type FilterSectionProps = {
-  title: string;
-  options: FilterOption[];
-  selectedIds: string[];
-  onSelect: (id: string) => void;
-  icon?: React.ReactNode;
-};
+// Drinks & Nightlife options with subcategories
+const drinksNightlifeOptions: FilterOption[] = [
+  { 
+    id: 'bars', 
+    label: 'Bars', 
+    icon: <BiDrink size={20} />,
+    isParent: true,
+    subcategories: [
+      { id: 'cocktail_bar', label: 'Cocktail Bars' },
+      { id: 'sports_bar', label: 'Sports Bars' },
+      { id: 'rooftop_bar', label: 'Rooftop Bars' },
+      { id: 'lounge', label: 'Lounges' }
+    ]
+  },
+  { 
+    id: 'clubs', 
+    label: 'Clubs', 
+    icon: <FaGlassCheers size={20} />,
+    isParent: true,
+    subcategories: [
+      { id: 'dance_club', label: 'Dance Clubs' },
+      { id: 'live_music', label: 'Live Music' },
+      { id: 'jazz_club', label: 'Jazz Clubs' },
+      { id: 'nightclub', label: 'Nightclubs' }
+    ]
+  },
+  { 
+    id: 'pubs', 
+    label: 'Pubs', 
+    icon: <BiDrink size={20} />,
+    isParent: true,
+    subcategories: [
+      { id: 'irish_pub', label: 'Irish Pubs' },
+      { id: 'craft_beer', label: 'Craft Beer' },
+      { id: 'gastropub', label: 'Gastropubs' },
+      { id: 'brewery', label: 'Breweries' }
+    ]
+  },
+  { 
+    id: 'wine_tasting', 
+    label: 'Wine Tasting', 
+    icon: <FaGlassCheers size={20} />,
+    isParent: true,
+    subcategories: [
+      { id: 'winery', label: 'Wineries' },
+      { id: 'wine_bar', label: 'Wine Bars' },
+      { id: 'vineyard', label: 'Vineyards' },
+      { id: 'wine_tours', label: 'Wine Tours' }
+    ]
+  }
+];
 
-const FilterSection = ({ title, options, selectedIds, onSelect, icon }: FilterSectionProps) => {
-  return (
-    <div className="flex flex-col pr-4 min-w-fit">
-      <div className="flex items-center gap-2 mb-2">
-        {icon && <span className="text-gray-700">{icon}</span>}
-        <h3 className="text-sm font-medium text-gray-800">{title}</h3>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {options.map((option) => (
-          <button
-            key={option.id}
-            onClick={() => onSelect(option.id)}
-            className={cn(
-              "px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-1.5",
-              selectedIds.includes(option.id)
-                ? "bg-primary text-white shadow-sm"
-                : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-            )}
-          >
-            {option.icon && <span>{option.icon}</span>}
-            {option.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-};
+export interface CategoryFilter {
+  parentIds: string[];
+  childIds: string[];
+}
 
-// Define filter state interface
 export interface FilterState {
-  propertyTypes: string[];
-  priceRanges: string[];
-  bedrooms: string[];
-  bathrooms: string[];
+  accommodation: string[];
+  natureAdventure: string[];
+  relaxWellness: string[];
+  food: string[];
+  drinksNightlife: string[];
+  // Alternative hierarchical structure for future use if needed
+  hierarchical?: {
+    accommodation: CategoryFilter;
+    natureAdventure: CategoryFilter;
+    relaxWellness: CategoryFilter;
+    food: CategoryFilter;
+    drinksNightlife: CategoryFilter;
+  };
 }
 
 interface FilterBarProps {
@@ -101,33 +305,15 @@ interface FilterBarProps {
 }
 
 export default function FilterBar({ onFilterChange }: FilterBarProps) {
-  const [selectedPropertyTypes, setSelectedPropertyTypes] = useState<string[]>([]);
-  const [selectedPriceRanges, setSelectedPriceRanges] = useState<string[]>([]);
-  const [selectedBedrooms, setSelectedBedrooms] = useState<string[]>([]);
-  const [selectedBathrooms, setSelectedBathrooms] = useState<string[]>([]);
+  const [selectedAccommodation, setSelectedAccommodation] = useState<string[]>([]);
+  const [selectedNatureAdventure, setSelectedNatureAdventure] = useState<string[]>([]);
+  const [selectedRelaxWellness, setSelectedRelaxWellness] = useState<string[]>([]);
+  const [selectedFood, setSelectedFood] = useState<string[]>([]);
+  const [selectedDrinksNightlife, setSelectedDrinksNightlife] = useState<string[]>([]);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
-  const [showFilter, setShowFilter] = useState(false);
-  const [isMobile, setIsMobile] = useState(false); // Default to false
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    // Check if we're in the browser
-    if (typeof window !== 'undefined') {
-      // Initialize mobile state
-      setIsMobile(window.innerWidth <= 768);
-    
-      // Add resize listener
-      const handleResize = () => {
-        setIsMobile(window.innerWidth <= 768);
-      };
-    
-      window.addEventListener('resize', handleResize);
-      return () => window.removeEventListener('resize', handleResize);
-    }
-  }, []); // Empty dependency array means this runs once on mount
-
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const checkScroll = () => {
@@ -141,18 +327,42 @@ export default function FilterBar({ onFilterChange }: FilterBarProps) {
         }
       };
       
+      // Initial check
       checkScroll();
+      
+      // Also check after a short delay to ensure all content is rendered
+      const timer = setTimeout(checkScroll, 500);
+      
+      // Setup ResizeObserver for better responsiveness
+      let resizeObserver: ResizeObserver | null = null;
+      if ('ResizeObserver' in window) {
+        resizeObserver = new ResizeObserver(() => {
+          checkScroll();
+        });
+        
+        const scrollContainer = scrollContainerRef.current;
+        if (scrollContainer) {
+          resizeObserver.observe(scrollContainer);
+        }
+      }
 
+      // Add scroll listener
       const scrollContainer = scrollContainerRef.current;
       if (scrollContainer) {
         scrollContainer.addEventListener('scroll', checkScroll);
-        
-        return () => {
-          scrollContainer.removeEventListener('scroll', checkScroll);
-        };
       }
+      
+      return () => {
+        // Clean up all event listeners and observers
+        clearTimeout(timer);
+        resizeObserver?.disconnect();
+        
+        if (scrollContainer) {
+          scrollContainer.removeEventListener('scroll', checkScroll);
+        }
+      };
     }
-  }, []); // Empty dependency array means this runs once on mount
+  }, []);
 
   const scrollLeft = () => {
     const scrollContainer = scrollContainerRef.current;
@@ -168,256 +378,118 @@ export default function FilterBar({ onFilterChange }: FilterBarProps) {
     }
   };
 
-  const notifyFilterChange = (
-    propertyTypes: string[] = selectedPropertyTypes,
-    priceRanges: string[] = selectedPriceRanges,
-    bedrooms: string[] = selectedBedrooms,
-    bathrooms: string[] = selectedBathrooms
-  ) => {
+  const notifyFilterChange = (): void => {
     if (onFilterChange) {
       onFilterChange({
-        propertyTypes,
-        priceRanges,
-        bedrooms,
-        bathrooms
+        accommodation: selectedAccommodation,
+        natureAdventure: selectedNatureAdventure,
+        relaxWellness: selectedRelaxWellness,
+        food: selectedFood,
+        drinksNightlife: selectedDrinksNightlife
       });
     }
   };
 
-  const togglePropertyType = (id: string) => {
-    const newPropertyTypes = selectedPropertyTypes.includes(id) 
-      ? selectedPropertyTypes.filter(item => item !== id)
-      : [...selectedPropertyTypes, id];
-    
-    setSelectedPropertyTypes(newPropertyTypes);
-    notifyFilterChange(newPropertyTypes);
-  };
-
-  const togglePriceRange = (id: string) => {
-    const newPriceRanges = selectedPriceRanges.includes(id) 
-      ? selectedPriceRanges.filter(item => item !== id)
-      : [...selectedPriceRanges, id];
-    
-    setSelectedPriceRanges(newPriceRanges);
-    notifyFilterChange(undefined, newPriceRanges);
-  };
-
-  const toggleBedrooms = (id: string) => {
-    const newBedrooms = selectedBedrooms.includes(id) 
-      ? selectedBedrooms.filter(item => item !== id)
-      : [id];
-    
-    setSelectedBedrooms(newBedrooms);
-    notifyFilterChange(undefined, undefined, newBedrooms);
-  };
-
-  const toggleBathrooms = (id: string) => {
-    const newBathrooms = selectedBathrooms.includes(id) 
-      ? selectedBathrooms.filter(item => item !== id)
-      : [id];
-    
-    setSelectedBathrooms(newBathrooms);
-    notifyFilterChange(undefined, undefined, undefined, newBathrooms);
-  };
+  const handleToggleFilter = (categoryState: string[], setCategoryState: Dispatch<SetStateAction<string[]>>) => 
+    (id: string, parentId?: string): void => {
+      let newState = [...categoryState];
+      
+      if (categoryState.includes(id)) {
+        // Remove the selected item
+        newState = newState.filter(item => item !== id);
+        
+        // If a parent is deselected, also deselect all its children
+        const allOptions = [
+          ...accommodationOptions,
+          ...natureAdventureOptions,
+          ...relaxWellnessOptions,
+          ...foodOptions,
+          ...drinksNightlifeOptions
+        ];
+        const parent = allOptions.find(opt => opt.id === id);
+        
+        if (parent?.subcategories) {
+          const childIds = parent.subcategories.map(sub => sub.id);
+          newState = newState.filter(item => !childIds.includes(item));
+        }
+      } else {
+        // Add the selected item
+        newState.push(id);
+      }
+      
+      setCategoryState(newState);
+      setTimeout(() => notifyFilterChange(), 0); // Ensure state is updated before notification
+    };
 
   return (
     <div className="relative w-full bg-white border-b border-gray-200">
-      <div className="container mx-auto px-4 py-4 flex items-center gap-4">
-        {/* Filter Button - Always Visible */}
-        <button 
-          onClick={() => setShowFilter(prev => !prev)}
-          className={cn(
-            "flex items-center gap-2 min-w-[100px] px-4 py-2 border rounded-full text-sm font-medium transition-all shadow-sm",
-            showFilter ? "bg-primary text-white hover:bg-primary-dark" : "bg-white border-gray-300 text-gray-700 hover:border-gray-400"
-          )}
-        >
-          <IoFilterSharp size={16} />
-          <span>{showFilter ? "Hide Filters" : "Show Filters"}</span>
-        </button>
-
-        {/* Main Scroll Container */}
-        <div className="relative flex-1 overflow-hidden">
-          {/* Left Scroll Button */}
-          {canScrollLeft && isMobile && ( // Only show on mobile when scrolling is possible
-            <button 
-              onClick={scrollLeft}
-              className="absolute left-0 top-1/2 transform -translate-y-1/2 z-10 bg-white rounded-full p-1 shadow-md border border-gray-200 hover:bg-gray-100 focus:outline-none"
-            >
-              <FiChevronLeft size={20} />
-            </button>
-          )}
-          
-          {/* Scrollable Container */}
-          <div 
-            ref={scrollContainerRef}
-            className="overflow-x-auto flex gap-6 pb-2 scrollbar-hide"
-            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      <div className="relative w-full px-4 py-4">
+        {canScrollLeft && (
+          <button 
+            onClick={() => scrollLeft()}
+            className="absolute left-2 top-1/2 transform -translate-y-1/2 z-10 bg-white rounded-full p-1.5 shadow-md border border-gray-300 hover:bg-gray-50 focus:outline-none text-gray-700"
           >
-            {/* Property Type Section */}
+            <FiChevronLeft size={20} />
+          </button>
+        )}
+        
+        <div 
+          ref={scrollContainerRef}
+          className="overflow-x-auto flex gap-6 pb-2 scrollbar-hide"
+          style={{ 
+            scrollbarWidth: 'none', 
+            msOverflowStyle: 'none',
+            width: '100%',
+            display: 'flex',
+            flexWrap: 'nowrap',
+            overflowY: 'visible'
+          } as CSSProperties}
+        >
             <FilterSection 
-              title="Property Type" 
-              options={propertyTypes}
-              selectedIds={selectedPropertyTypes}
-              onSelect={togglePropertyType}
-              icon={<MdHouse />}
+              title="Accommodation" 
+              options={accommodationOptions}
+              selectedFilters={selectedAccommodation}
+              onToggleFilter={handleToggleFilter(selectedAccommodation, setSelectedAccommodation)}
             />
             
-            {/* Price Range Section */}
             <FilterSection 
-              title="Price Range" 
-              options={priceRanges}
-              selectedIds={selectedPriceRanges}
-              onSelect={togglePriceRange}
+              title="Nature & Adventure" 
+              options={natureAdventureOptions}
+              selectedFilters={selectedNatureAdventure}
+              onToggleFilter={handleToggleFilter(selectedNatureAdventure, setSelectedNatureAdventure)}
             />
             
-            {/* Bedrooms Section */}
             <FilterSection 
-              title="Bedrooms" 
-              options={bedrooms}
-              selectedIds={selectedBedrooms}
-              onSelect={toggleBedrooms}
-              icon={<LuBedDouble />}
+              title="Relax & Wellness" 
+              options={relaxWellnessOptions}
+              selectedFilters={selectedRelaxWellness}
+              onToggleFilter={handleToggleFilter(selectedRelaxWellness, setSelectedRelaxWellness)}
             />
             
-            {/* Bathrooms Section */}
             <FilterSection 
-              title="Bathrooms" 
-              options={bathrooms}
-              selectedIds={selectedBathrooms}
-              onSelect={toggleBathrooms}
-              icon={<TbBath />}
+              title="Food" 
+              options={foodOptions}
+              selectedFilters={selectedFood}
+              onToggleFilter={handleToggleFilter(selectedFood, setSelectedFood)}
+            />
+            
+            <FilterSection 
+              title="Drinks & Nightlife" 
+              options={drinksNightlifeOptions}
+              selectedFilters={selectedDrinksNightlife}
+              onToggleFilter={handleToggleFilter(selectedDrinksNightlife, setSelectedDrinksNightlife)}
             />
           </div>
           
-          {/* Right Scroll Button */}
-          {canScrollRight && isMobile && ( // Only show on mobile when scrolling is possible
+          {canScrollRight && (
             <button 
-              onClick={scrollRight}
-              className="absolute right-0 top-1/2 transform -translate-y-1/2 z-10 bg-white rounded-full p-1 shadow-md border border-gray-200 hover:bg-gray-100 focus:outline-none"
+              onClick={() => scrollRight()}
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 z-10 bg-white rounded-full p-1.5 shadow-md border border-gray-300 hover:bg-gray-50 focus:outline-none text-gray-700"
             >
               <FiChevronRight size={20} />
             </button>
           )}
-        </div>
       </div>
-
-      {/* Advanced Filter Panel */}
-      {showFilter && (
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          className="absolute top-full left-0 w-full bg-white shadow-lg rounded-b-lg z-20"
-        >
-          <div className="container mx-auto p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold">Filters</h2>
-              <button 
-                onClick={() => {
-                  setSelectedPropertyTypes([]);
-                  setSelectedPriceRanges([]);
-                  setSelectedBedrooms([]);
-                  setSelectedBathrooms([]);
-                  notifyFilterChange([], [], [], []);
-                  setShowFilter(false);
-                }}
-                className="text-gray-600 hover:text-gray-900"
-              >
-                Clear all
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {/* Property Types */}
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Property Type</h3>
-                <div className="space-y-2">
-                  {propertyTypes.map((option) => (
-                    <button
-                      key={option.id}
-                      onClick={() => togglePropertyType(option.id)}
-                      className={cn(
-                        "w-full px-4 py-3 rounded-lg text-sm font-medium transition-all flex items-center gap-2",
-                        selectedPropertyTypes.includes(option.id)
-                          ? "bg-primary text-white"
-                          : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-                      )}
-                    >
-                      {option.icon}
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Price Ranges */}
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Price Range</h3>
-                <div className="space-y-2">
-                  {priceRanges.map((option) => (
-                    <button
-                      key={option.id}
-                      onClick={() => togglePriceRange(option.id)}
-                      className={cn(
-                        "w-full px-4 py-3 rounded-lg text-sm font-medium transition-all",
-                        selectedPriceRanges.includes(option.id)
-                          ? "bg-primary text-white"
-                          : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-                      )}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Bedrooms */}
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Bedrooms</h3>
-                <div className="space-y-2">
-                  {bedrooms.map((option) => (
-                    <button
-                      key={option.id}
-                      onClick={() => toggleBedrooms(option.id)}
-                      className={cn(
-                        "w-full px-4 py-3 rounded-lg text-sm font-medium transition-all flex items-center gap-2",
-                        selectedBedrooms.includes(option.id)
-                          ? "bg-primary text-white"
-                          : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-                      )}
-                    >
-                      <LuBedDouble />
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Bathrooms */}
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Bathrooms</h3>
-                <div className="space-y-2">
-                  {bathrooms.map((option) => (
-                    <button
-                      key={option.id}
-                      onClick={() => toggleBathrooms(option.id)}
-                      className={cn(
-                        "w-full px-4 py-3 rounded-lg text-sm font-medium transition-all flex items-center gap-2",
-                        selectedBathrooms.includes(option.id)
-                          ? "bg-primary text-white"
-                          : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-                      )}
-                    >
-                      <TbBath />
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-      )}
     </div>
   );
 }
