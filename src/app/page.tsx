@@ -1,15 +1,7 @@
 "use client";
 
-import useSWR from "swr";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import ReactDOM from "react-dom";
+import { useState } from "react";
 import Link from "next/link";
-import GeoNetworkGlobe from "@/components/GeoNetworkGlobe";
-import SearchBar from "@/components/SearchBar";
-import { VisualizationProvider } from '@/context/VisualizationContext';
-import FilterBar from "@/components/FilterBar";
-
 export default function Home() {
   const [location, setLocation] = useState("");
   const [filters, setFilters] = useState({});
@@ -24,12 +16,12 @@ export default function Home() {
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800">
-      {/* Header Section with SearchBar and FilterBar */}
+      {/* Header Section */}
       <div className="sticky top-0 z-50 bg-white shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <SearchBar onLocationChange={handleLocationChange} />
+          {/* Search functionality moved to header */}
           <div className="mt-4">
-            <FilterBar onFilterChange={handleFilterChange} />
+            {/* Filter functionality moved to header */}
           </div>
         </div>
       </div>
@@ -46,12 +38,9 @@ export default function Home() {
         </div>
       </div>
       
-      {/* Globe Visualization Section */}
+      {/* Visualization Section - Removed GeoNetworkGlobe */}
       <div className="relative w-full mb-12 bg-gray-800 rounded-xl overflow-hidden">
-        <GeoNetworkGlobe 
-          height="600px"
-          standalone={true}
-        />
+        {/* Globe visualization content will be handled elsewhere */}
       </div>
       
       {/* Featured Content */}
