@@ -1,0 +1,19 @@
+.globeContainer {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: #000820;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.globeContainer canvas {
+  cursor: grab;
+}
+
+.globeContainer canvas:active {
+  cursor: grabbing;
+}
+

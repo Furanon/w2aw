@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import MiniGlobe from "../../components/MiniGlobe";
 export default function Home() {
   const [location, setLocation] = useState("");
   const [filters, setFilters] = useState({});
@@ -38,9 +39,21 @@ export default function Home() {
         </div>
       </div>
       
-      {/* Visualization Section - Removed GeoNetworkGlobe */}
-      <div className="relative w-full mb-12 bg-gray-800 rounded-xl overflow-hidden">
-        {/* Globe visualization content will be handled elsewhere */}
+      {/* Visualization Section - Globe */}
+      <div className="relative w-full mb-12 bg-gray-800 rounded-xl overflow-hidden py-8">
+        <div className="max-w-3xl mx-auto flex justify-center items-center">
+          <MiniGlobe 
+            width={500}
+            height={500}
+            markers={[
+              { location: [37.7595, -122.4367], size: 0.03 },
+              { location: [40.7128, -74.006], size: 0.1 }
+            ]}
+            mapBrightness={6}
+            baseColor={[0.3, 0.3, 0.3]}
+            markerColor={[0.1, 0.8, 1]}
+          />
+        </div>
       </div>
       
       {/* Featured Content */}
