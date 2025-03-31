@@ -1,6 +1,17 @@
-import { Kafka, Producer, Consumer, KafkaConfig } from "kafkajs";
-      import { KAFKA_CONFIG, KAFKA_TOPICS, KafkaTopics } from "./config/kafka";
+import { Kafka } from "kafkajs";
+import type { Producer, Consumer, KafkaConfig } from "kafkajs";
+import { KAFKA_CONFIG, KAFKA_TOPICS } from "./config/kafka";
+import type { KafkaTopics } from "./config/kafka";
 
+/**
+ * Kafka consumer group IDs
+ */
+const KAFKA_CONSUMER_GROUPS = {
+  MARKETPLACE: "marketplace-consumer-group",
+  USER_ACTIVITY: "user-activity-consumer-group",
+  NOTIFICATIONS: "notifications-consumer-group",
+  ANALYTICS: "analytics-consumer-group",
+};
       /**
        * Singleton Kafka client instance
        */
@@ -76,7 +87,7 @@ import { Kafka, Producer, Consumer, KafkaConfig } from "kafkajs";
         
         constructor(
           private readonly groupId: string,
-          private readonly topics: KafkaTopics[],
+          private readonly topics: string[],
           private readonly config: Partial<KafkaConfig> = {}
         ) {
           this.consumer = KafkaClient.getInstance().consumer({
@@ -102,7 +113,7 @@ import { Kafka, Producer, Consumer, KafkaConfig } from "kafkajs";
           }
         }
         
-        public onMessage(topic: KafkaTopics, handler: MessageHandler): void {
+        public onMessage(topic: string, handler: MessageHandler): void {
           this.handlers.set(topic, handler);
         }
         
@@ -124,4 +135,7 @@ import { Kafka, Producer, Consumer, KafkaConfig } from "kafkajs";
         }
       }
 
-      export { KAFKA_TOPICS, KAFKA_CONFIG, KafkaTopics };
+// Export constants and classes directly
+export { KAFKA_TOPICS, KAFKA_CONFIG, KAFKA_CONSUMER_GROUPS };
+// Export types
+export type { KafkaTopics, MessageHandler };

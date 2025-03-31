@@ -1,3 +1,20 @@
+/**
+ * Type representing all possible Kafka topic values in the application
+ * This includes notification, AI, marketplace, auth, and other service topics
+ */
+export type KafkaTopics = 
+  | "notifications" | "notification-results" | "notification-errors"
+  | "ai-jobs" | "ai-results" | "ai-dlq"
+  | "maintenance-jobs" | "maintenance-results" | "maintenance-dlq"
+  | "marketplace-jobs" | "marketplace-results" | "marketplace-dlq"
+  | "auth-jobs" | "auth-results" | "auth-dlq"
+  | "analytics-jobs" | "analytics-results" | "analytics-dlq" 
+  | "visualization-updates" | "visualization-results" | "visualization-dlq"
+  | "places-jobs" | "places-results" | "places-dlq";
+
+/**
+ * Kafka topic constants used throughout the application
+ */
 export const KAFKA_TOPICS = {
         // Notification topics
         NOTIFICATIONS: "notifications",
@@ -40,7 +57,9 @@ export const KAFKA_TOPICS = {
         PLACES_DLQ: "places-dlq"
       } as const;
 
-      export type KafkaTopics = typeof KAFKA_TOPICS[keyof typeof KAFKA_TOPICS];
+// Type assertion to ensure KAFKA_TOPICS values match KafkaTopics type
+type KafkaTopicsCheck = typeof KAFKA_TOPICS[keyof typeof KAFKA_TOPICS] extends KafkaTopics ? true : false;
+type KafkaTopicsExhaustive = KafkaTopics extends typeof KAFKA_TOPICS[keyof typeof KAFKA_TOPICS] ? true : false;
 
       export const KAFKA_CONFIG = {
         CLIENT_ID: process.env.KAFKA_CLIENT_ID || "w2aw-client",

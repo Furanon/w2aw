@@ -1,4 +1,4 @@
-import { consumeMessages } from '../../../lib/kafka';
+import { KafkaConsumer, KAFKA_TOPICS, KAFKA_CONSUMER_GROUPS } from '../../../lib/kafka';
 import { query } from '../../../lib/db';
 import { NextResponse } from 'next/server';
 
@@ -34,7 +34,12 @@ async function storeNotification(listingData: ListingData) {
 }
 
 // Kafka message handler
-async function handleNewListingMessage(message: any) {
+async function handleNewListingMessage(message: {
+  value: Buffer;
+  key?: string;
+  timestamp?: string;
+  headers?: Record<string, string>;
+}) {
   try {
     // Parse the message value
     const listingData = JSON.parse(message.value.toString());
@@ -49,6 +54,7 @@ async function handleNewListingMessage(message: any) {
 
 // Start the Kafka consumer when the server starts
 let consumerRunning = false;
+let kafkaConsumer: KafkaConsumer | null = null;
 
 export async function startKafkaConsumer() {
   if (consumerRunning) {
@@ -57,11 +63,25 @@ export async function startKafkaConsumer() {
   }
   
   try {
-    console.log('Starting Kafka consumer for new-listing topic');
+    console.log(`Starting Kafka consumer for ${KAFKA_TOPICS.MARKETPLACE_JOBS} topic`);
     consumerRunning = true;
     
-    // Start consuming messages from the "new-listing" topic
-    await consumeMessages('new-listing', handleNewListingMessage);
+    // Create a new KafkaConsumer instance
+    kafkaConsumer = new KafkaConsumer(
+      KAFKA_CONSUMER_GROUPS.MARKETPLACE,
+      [KAFKA_TOPICS.MARKETPLACE_JOBS]
+    );
+    
+    // Register message handler for the topic
+    kafkaConsumer.onMessage(
+      KAFKA_TOPICS.MARKETPLACE_JOBS, 
+      async ({ message }) => {
+        await handleNewListingMessage(message);
+      }
+    );
+    
+    // Start the consumer
+    await kafkaConsumer.start();
   } catch (error) {
     consumerRunning = false;
     console.error('Error starting Kafka consumer:', error);

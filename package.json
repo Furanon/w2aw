@@ -11,7 +11,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "kafka-consumer": "ts-node-esm --project tsconfig.node.json app/api/kafka-consumer.ts",
+    "kafka-consumer": "tsx src/app/api/kafka-consumer/route.ts",
     "apply-migrations": "node --loader ts-node/esm --project tsconfig.node.json lib/migrations/apply-migrations.ts",
     "test-kafka": "tsx scripts/test-kafka-message.ts",
     "test-kafka-listing": "tsx scripts/test-kafka-listing.ts"
@@ -41,6 +41,7 @@
     "cobe": "^0.6.3",
     "dotenv": "^16.4.7",
     "framer-motion": "^12.5.0",
+    "globe.gl": "^2.41.2",
     "kafkajs": "^2.2.4",
     "leaflet": "^1.9.4",
     "next": "^15.2.3",
