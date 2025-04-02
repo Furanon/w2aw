@@ -6,6 +6,8 @@ module.exports = {
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/**/*.{js,ts,jsx,tsx,mdx}',
     './lib/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/components/calendar/**/*.{js,ts,jsx,tsx}', 
+    './src/app/calendar/**/*.{js,ts,jsx,tsx}',
   ],
   theme: {
     extend: {
@@ -44,6 +46,19 @@ module.exports = {
           foreground: "hsl(var(--destructive-foreground))",
         },
       },
+      // Calendar-specific colors
+      calendarEvent: {
+        regular: "#4338ca", // Indigo for regular events
+        teacher: "#0891b2", // Cyan for teacher events
+        teacherFeatured: "#0e7490", // Darker cyan for featured teachers
+        userJoined: "#84cc16", // Lime for user-joined events
+        typeRelax: "#8b5cf6", // Purple for Relax and Wellness
+        typeOutdoor: "#22c55e", // Green for Outdoor and Active
+        typeBeach: "#f59e0b", // Amber for Beach and Sun
+        typeDrinks: "#ec4899", // Pink for Drinks and Nightlife
+        typeFood: "#f97316", // Orange for Food and Family
+        typeAccommodation: "#06b6d4", // Cyan for Accommodation
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
@@ -63,6 +78,31 @@ module.exports = {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
       },
+    },
+    // Custom backdrop blur and opacity
+    backdropBlur: {
+      xs: '2px',
+      sm: '4px',
+      DEFAULT: '8px',
+      md: '12px',
+      lg: '16px',
+      xl: '24px',
+      '2xl': '40px',
+      '3xl': '64px',
+    },
+    backdropOpacity: {
+      0: '0',
+      10: '0.1',
+      20: '0.2',
+      30: '0.3',
+      40: '0.4',
+      50: '0.5',
+      60: '0.6',
+      70: '0.7',
+      80: '0.8',
+      90: '0.9',
+      95: '0.95',
+      100: '1',
     },
   },
   plugins: [

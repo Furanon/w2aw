@@ -37,7 +37,13 @@ export const KAFKA_TOPICS = {
         // Places topics (new)
         PLACES_JOBS: "places-jobs",
         PLACES_RESULTS: "places-results",
-        PLACES_DLQ: "places-dlq"
+        PLACES_DLQ: "places-dlq",
+        
+        // Calendar topics
+        CALENDAR_EVENTS: "calendar-events",
+        CALENDAR_NOTIFICATIONS: "calendar-notifications",
+        CALENDAR_UPDATES: "calendar-updates",
+        CALENDAR_DLQ: "calendar-dlq"
       } as const;
 
       export type KafkaTopics = typeof KAFKA_TOPICS[keyof typeof KAFKA_TOPICS];
@@ -77,6 +83,7 @@ export const KAFKA_TOPICS = {
         ANALYTICS: "analytics-processor",
         VISUALIZATION: "visualization-processor",
         PLACES: "places-processor",
+        CALENDAR: "calendar-processor",
         // Error handling consumer groups
         DLQ_PROCESSOR: "dlq-processor",
       } as const;
@@ -107,5 +114,9 @@ export const KAFKA_TOPICS = {
           AUTO_COMMIT: false, // Manual commit for DLQ processing
           MAX_BYTES: 10485760, // 10MB for error analysis
           ISOLATION_LEVEL: 0, // Read uncommitted (0) to ensure all errors are processed
+        },
+        CALENDAR: {
+          MAX_WAIT_TIME_MS: 3000, // Slightly faster processing for calendar events
+          MAX_BYTES: 2097152, // 2MB for calendar event payloads with attachments
         },
       };
