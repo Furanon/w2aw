@@ -9,21 +9,13 @@ import TimeSlotModal from './TimeSlotModal';
 // Initialize the localizer
 const localizer = momentLocalizer(moment);
 
-// Event types with corresponding colors
-export const EVENT_TYPES = [
-  { id: 1, name: 'Relax and Wellness', color: '#4CAF50' },
-  { id: 2, name: 'Outdoor and Active', color: '#2196F3' },
-  { id: 3, name: 'Beach and Sun', color: '#FF9800' },
-  { id: 4, name: 'Drinks and Nightlife', color: '#9C27B0' },
-  { id: 5, name: 'Food and Family', color: '#F44336' },
-  { id: 6, name: 'Accommodation', color: '#795548' },
-];
+// Import filter types from shared location
+import { EVENT_TYPES, FilterState, SPECIAL_STATUS_COLORS } from '@/types/filters';
 
-// Special status colors
-const TEACHER_COLOR = '#3F51B5';
-const HIGHLY_ACKNOWLEDGED_TEACHER_COLOR = '#1A237E';
-const USER_JOINED_COLOR = '#8BC34A';
-
+// Using constants from imported SPECIAL_STATUS_COLORS
+const TEACHER_COLOR = SPECIAL_STATUS_COLORS.TEACHER;
+const HIGHLY_ACKNOWLEDGED_TEACHER_COLOR = SPECIAL_STATUS_COLORS.HIGHLY_ACKNOWLEDGED_TEACHER;
+const USER_JOINED_COLOR = SPECIAL_STATUS_COLORS.USER_JOINED;
 // TypeScript interfaces
 export interface TimeSlot {
   id: string;
@@ -41,13 +33,7 @@ export interface TimeSlot {
   price?: number;
 }
 
-export interface FilterState {
-  typeIds: number[];
-  locations: string[];
-  showPaidOnly: boolean;
-  showFreeOnly: boolean;
-  showJoinedOnly: boolean;
-}
+// FilterState interface moved to src/types/filters.ts
 
 interface CalendarProps {
   onTimeSlotCreated?: (timeSlot: TimeSlot) => void;
