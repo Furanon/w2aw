@@ -119,6 +119,9 @@ export const recommendationTypeEnum = [
   'similar_course',
   'price_drop',
   'availability',
+  'business_recommendation',
+  'person_recommendation',
+  'location_recommendation',
 ] as const;
 
 // User course preferences table for storing likes and recommendation preferences
@@ -167,7 +170,83 @@ export const courseRecommendations = pgTable('course_recommendations', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   // Add a unique constraint for user-event recommendation pairs
   uniqueRecommendation: unique().on(userId, eventId),
+170|});
+
+// User business preferences table for storing business likes and recommendation preferences
+export const userBusinessPreferences = pgTable('user_business_preferences', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id).notNull(),
+  businessId: integer('business_id').references(() => listings.id).notNull(), // Using listings as businesses
+  preferredCategory: varchar('preferred_category', { length: 255 }),
+  preferredServices: array('preferred_services').element(varchar('service', { length: 100 })),
+  preferredPriceRange: jsonb('preferred_price_range').$type<{min: number, max: number}>(),
+  preferredRating: decimal('preferred_rating', { precision: 3, scale: 2 }),
+  locationId: integer('location_id').references(() => locations.id),
+  preferredDistance: decimal('preferred_distance', { precision: 10, scale: 2 }), // Max distance in km
+  socialData: jsonb('social_data'), // For storing Facebook/Google interests related to businesses
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  // Add a unique constraint to prevent duplicate likes
+  uniqueBusinessPreference: unique().on(userId, businessId),
 });
+
+// User person preferences table for storing person/instructor likes and recommendation preferences
+export const userPersonPreferences = pgTable('user_person_preferences', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id).notNull(),
+  personId: integer('person_id').references(() => users.id).notNull(), // The person/instructor being liked
+  preferredExpertise: array('preferred_expertise').element(varchar('expertise', { length: 100 })),
+  preferredTeachingStyle: varchar('preferred_teaching_style', { length: 255 }),
+  preferredCommunicationStyle: varchar('preferred_communication_style', { length: 255 }),
+  experienceLevel: varchar('experience_level', { length: 50 }), // 'beginner', 'intermediate', 'advanced'
+  socialData: jsonb('social_data'), // For storing Facebook/Google interests related to instructors
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  // Add a unique constraint to prevent duplicate likes
+  uniquePersonPreference: unique().on(userId, personId),
+});
+
+// User location preferences table for storing location likes and recommendation preferences
+export const userLocationPreferences = pgTable('user_location_preferences', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id).notNull(),
+  locationId: integer('location_id').references(() => locations.id).notNull(),
+  preferredAccessibility: array('preferred_accessibility').element(varchar('feature', { length: 100 })),
+  preferredAmenities: array('preferred_amenities').element(varchar('amenity', { length: 100 })),
+  preferredCapacity: integer('preferred_capacity'),
+  preferredDistance: decimal('preferred_distance', { precision: 10, scale: 2 }), // Max distance in km from home/work
+  homeCoordinates: json('home_coordinates').$type<[number, number]>(), // [latitude, longitude] for distance calc
+  workCoordinates: json('work_coordinates').$type<[number, number]>(), // [latitude, longitude] for distance calc
+  preferredTransportType: varchar('preferred_transport_type', { length: 50 }), // 'walk', 'bike', 'public', 'car'
+  socialData: jsonb('social_data'), // For storing Facebook/Google interests related to locations
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  // Add a unique constraint to prevent duplicate likes
+  uniqueLocationPreference: unique().on(userId, locationId),
+});
+
+// Create indexes for efficient querying
+export const userBusinessPreferencesIndexes = {
+  byUser: index('idx_user_business_prefs_user').on(userBusinessPreferences.userId),
+  byBusiness: index('idx_user_business_prefs_business').on(userBusinessPreferences.businessId),
+  byCategory: index('idx_user_business_prefs_category').on(userBusinessPreferences.preferredCategory),
+  byLocation: index('idx_user_business_prefs_location').on(userBusinessPreferences.locationId),
+};
+
+export const userPersonPreferencesIndexes = {
+  byUser: index('idx_user_person_prefs_user').on(userPersonPreferences.userId),
+  byPerson: index('idx_user_person_prefs_person').on(userPersonPreferences.personId),
+  byExpertise: index('idx_user_person_prefs_expertise').on(userPersonPreferences.preferredExpertise),
+};
+
+export const userLocationPreferencesIndexes = {
+  byUser: index('idx_user_location_prefs_user').on(userLocationPreferences.userId),
+  byLocation: index('idx_user_location_prefs_location').on(userLocationPreferences.locationId),
+  byCapacity: index('idx_user_location_prefs_capacity').on(userLocationPreferences.preferredCapacity),
+};
 
 export type User = InferModel<typeof users>;
 export type Listing = InferModel<typeof listings>;
@@ -178,3 +257,6 @@ export type EventParticipant = InferModel<typeof eventParticipants>;
 export type UserCoursePreference = InferModel<typeof userCoursePreferences>;
 export type PreferenceFeature = InferModel<typeof preferenceFeatures>;
 export type CourseRecommendation = InferModel<typeof courseRecommendations>;
+export type UserBusinessPreference = InferModel<typeof userBusinessPreferences>;
+export type UserPersonPreference = InferModel<typeof userPersonPreferences>;
+export type UserLocationPreference = InferModel<typeof userLocationPreferences>;
