@@ -4,8 +4,6 @@ import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import FilterBar, { FilterState } from '@/components/FilterBar';
-import SearchBar from '@/components/SearchBar';
 import { FiArrowUp, FiArrowDown, FiHome, FiDollarSign, FiCalendar, FiMap } from 'react-icons/fi';
 
 // Types
@@ -53,74 +51,22 @@ export default function ListingsPage() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [location, setLocation] = useState('');
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
-  const [priceMin, setPriceMin] = useState<string | null>(null);
-  const [priceMax, setPriceMax] = useState<string | null>(null);
-  const [propertyType, setPropertyType] = useState<string | null>(null);
 
   const searchParams = useSearchParams();
   const router = useRouter();
 
   useEffect(() => {
     const page = searchParams.get('page') || '1';
-    const location = searchParams.get('location') || '';
     const sort_by = searchParams.get('sort_by') || 'created_at';
     const sort_order = searchParams.get('sort_order') || 'desc';
-    const price_min = searchParams.get('price_min');
-    const price_max = searchParams.get('price_max');
-    const property_type = searchParams.get('property_type');
 
     setPagination(prev => ({ ...prev, currentPage: parseInt(page, 10) }));
-    setLocation(location);
     setSortBy(sort_by);
     setSortOrder(sort_order);
-    setPriceMin(price_min);
-    setPriceMax(price_max);
-    setPropertyType(property_type);
   }, [searchParams]);
 
-  const handleFilterChange = (filters: FilterState) => {
-    let newPriceMin = null;
-    let newPriceMax = null;
-    let newPropertyType = null;
-
-    if (filters.propertyTypes.length > 0) {
-      newPropertyType = filters.propertyTypes[0];
-    }
-
-    if (filters.priceRanges.length > 0) {
-      const priceRange = filters.priceRanges[0];
-      if (priceRange === 'price_0_500') {
-        newPriceMax = '500';
-      } else if (priceRange === 'price_500_1500') {
-        newPriceMin = '500';
-        newPriceMax = '1500';
-      } else if (priceRange === 'price_1500_3000') {
-        newPriceMin = '1500';
-        newPriceMax = '3000';
-      } else if (priceRange === 'price_3000_5000') {
-        newPriceMin = '3000';
-        newPriceMax = '5000';
-      } else if (priceRange === 'price_5000_plus') {
-        newPriceMin = '5000';
-      }
-    }
-
-    setPriceMin(newPriceMin);
-    setPriceMax(newPriceMax);
-    setPropertyType(newPropertyType);
-    setPagination(prev => ({ ...prev, currentPage: 1 }));
-
-    updateUrlAndFetch(1, location, sortBy, sortOrder, newPriceMin, newPriceMax, newPropertyType);
-  };
-
-  const handleLocationChange = (newLocation: string) => {
-    setLocation(newLocation);
-    setPagination(prev => ({ ...prev, currentPage: 1 }));
-    updateUrlAndFetch(1, newLocation, sortBy, sortOrder, priceMin, priceMax, propertyType);
-  };
 
   const handleSortChange = (newSortBy: string) => {
     const newSortOrder = newSortBy === sortBy && sortOrder === 'asc' ? 'desc' : 'asc';
@@ -128,38 +74,26 @@ export default function ListingsPage() {
     setSortOrder(newSortOrder);
     updateUrlAndFetch(
       pagination.currentPage,
-      location,
       newSortBy,
-      newSortOrder,
-      priceMin,
-      priceMax,
-      propertyType
+      newSortOrder
     );
   };
 
   const handlePageChange = (newPage: number) => {
     if (newPage < 1 || newPage > pagination.totalPages) return;
     setPagination(prev => ({ ...prev, currentPage: newPage }));
-    updateUrlAndFetch(newPage, location, sortBy, sortOrder, priceMin, priceMax, propertyType);
+    updateUrlAndFetch(newPage, sortBy, sortOrder);
   };
 
   const updateUrlAndFetch = (
     page: number,
-    location: string,
     sort_by: string,
-    sort_order: string,
-    price_min: string | null,
-    price_max: string | null,
-    property_type: string | null,
+    sort_order: string
   ) => {
     const queryParams = buildQueryString({
       page,
-      location: location || undefined,
       sort_by,
       sort_order,
-      price_min,
-      price_max,
-      property_type,
       limit: 12
     });
 
@@ -190,12 +124,8 @@ export default function ListingsPage() {
   useEffect(() => {
     const queryParams = buildQueryString({
       page: pagination.currentPage,
-      location: location || undefined,
       sort_by: sortBy,
       sort_order: sortOrder,
-      price_min: priceMin,
-      price_max: priceMax,
-      property_type: propertyType,
       limit: 12
     });
 
@@ -277,22 +207,6 @@ export default function ListingsPage() {
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Property Listings</h1>
 
-        <div className="mb-8">
-          <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="w-full md:w-1/3">
-                <SearchBar
-                  placeholder="Search by location"
-                  onLocationChange={handleLocationChange}
-                  initialValue={location}
-                  className="w-full"
-                />
-              </div>
-            </div>
-          </div>
-
-          <FilterBar onFilterChange={handleFilterChange} />
-        </div>
 
         <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
           <div className="flex flex-wrap items-center justify-between">

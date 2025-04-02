@@ -1,27 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import dynamic from 'next/dynamic';
 import { MarketplaceActivity } from '@/types/marketplace';
-import VisualizationDemo from '@/components/VisualizationDemo';
-import { VisualizationProvider } from '@/context/VisualizationContext';
-import { VisualizationNode } from '@/types/visualization';
-
-// Loading indicator component
-const GlobeLoadingIndicator = () => (
-  <div className="flex flex-col items-center justify-center h-[70vh] w-full">
-    <div className="w-24 h-24 rounded-full border-t-4 border-b-4 border-blue-500 animate-spin"></div>
-    <p className="mt-4 text-lg font-medium text-gray-700">Loading Globe...</p>
-  </div>
-);
-
-// Dynamically import GeoNetworkGlobe
-const GeoNetworkGlobe = dynamic(
-  () => import('@/components/GeoNetworkGlobe'),
-  { ssr: false, loading: () => <GlobeLoadingIndicator /> }
-);
-
 interface PageState {
   userLocation: {
     latitude: number;
@@ -76,8 +57,6 @@ export default function GlobePage() {
     error: null,
     selectedActivity: null,
   });
-  const [viewMode, setViewMode] = useState<'network' | 'visualization'>('network');
-
   const fetchActivities = useCallback(async (lat?: number, lng?: number) => {
     try {
       setState(prev => ({ ...prev, isLoadingActivities: true }));
@@ -151,63 +130,42 @@ export default function GlobePage() {
     );
   }, [fetchActivities]);
 
-  const handleActivitySelect = useCallback((node: VisualizationNode) => {
-    // Extract the first activity from the node's activities array
-    const activity = node.activities?.[0];
-    if (activity) {
-      setState(prev => ({ ...prev, selectedActivity: activity }));
-    }
-  }, []);
-
   const handleViewDetails = useCallback((activity: MarketplaceActivity) => {
     router.push(`/marketplace/activity/${activity.id}`);
   }, [router]);
 
   if (state.isLoadingLocation || state.isLoadingActivities) {
-    return <GlobeLoadingIndicator />;
+    return (
+      <div className="flex flex-col items-center justify-center h-[70vh] w-full">
+        <div className="w-24 h-24 rounded-full border-t-4 border-b-4 border-blue-500 animate-spin"></div>
+        <p className="mt-4 text-lg font-medium text-gray-700">Loading...</p>
+      </div>
+    );
   }
 
   return (
-    <VisualizationProvider>
-      <div className="relative w-full min-h-screen bg-gray-100 dark:bg-gray-900">
+    <div className="relative w-full min-h-screen bg-gray-100 dark:bg-gray-900">
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold mb-6 text-center">Global Network Visualization</h1>
         
-        <div className="mb-6 flex justify-center space-x-4">
-          <button 
-            onClick={() => setViewMode('network')}
-            className={`px-4 py-2 rounded ${viewMode === 'network' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800'}`}
-          >
-            Network View
-          </button>
-          <button 
-            onClick={() => setViewMode('visualization')}
-            className={`px-4 py-2 rounded ${viewMode === 'visualization' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800'}`}
-          >
-            Enhanced Visualization
-          </button>
+        <div className="w-full p-8 bg-white dark:bg-gray-800 rounded-lg shadow-md text-center">
+          <h2 className="text-2xl font-semibold mb-4">Feature Removed</h2>
+          <p className="text-lg text-gray-600 dark:text-gray-300 mb-6">
+            The Global Network Visualization feature has been temporarily removed for maintenance and improvements.
+          </p>
+          <p className="text-md text-gray-500 dark:text-gray-400">
+            Please check back later for an enhanced version of this feature.
+          </p>
+          
+          {state.selectedActivity && (
+            <div className="mt-8 p-4 border border-gray-200 dark:border-gray-700 rounded-lg max-w-lg mx-auto">
+              <h3 className="text-lg font-medium">Last Selected: {state.selectedActivity.name}</h3>
+              <p className="mt-2 text-gray-600 dark:text-gray-300">
+                {state.selectedActivity.description}
+              </p>
+            </div>
+          )}
         </div>
-        
-        {viewMode === 'network' ? (
-          <div className="w-full h-[70vh] bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
-            <GeoNetworkGlobe 
-              height="70vh"
-              onNodeSelect={handleActivitySelect}
-            />
-            {state.selectedActivity && (
-              <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg max-w-lg w-full mx-4 z-20">
-                <h3 className="text-lg font-medium">Selected Node: {state.selectedActivity.name}</h3>
-                <p className="mt-2 text-gray-600 dark:text-gray-300">
-                  {state.selectedActivity.description}
-                </p>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="w-full bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
-            <VisualizationDemo />
-          </div>
-        )}
       </div>
     </div>
   );

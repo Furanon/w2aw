@@ -75,45 +75,6 @@
   }
 }
 
-/* FilterBar Custom Styles */
-.filter-chip {
-  @apply inline-flex items-center py-1.5 px-3 rounded-full text-sm border border-gray-200 
-         hover:border-blue-600 hover:bg-blue-50 transition-colors cursor-pointer select-none
-         dark:border-gray-700 dark:hover:border-blue-500 dark:hover:bg-blue-900/20;
-}
-
-.filter-chip.active {
-  @apply bg-blue-100 border-blue-600 text-blue-600 font-medium
-         dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-400;
-}
-
-.filters-container {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;     /* Firefox */
-}
-
-.filters-container::-webkit-scrollbar {
-  display: none;             /* Chrome, Safari and Opera */
-}
-
-.scroll-button {
-  @apply absolute top-1/2 -translate-y-1/2 z-10 bg-white rounded-full 
-         p-1 shadow-md border border-gray-200 hover:bg-gray-100 focus:outline-none
-         dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700;
-}
-
-.scroll-button-left {
-  @apply left-0;
-}
-
-.scroll-button-right {
-  @apply right-0;
-}
-
-.filter-dropdown {
-  @apply absolute z-30 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg 
-         overflow-hidden py-1 w-48 dark:bg-gray-800 dark:border-gray-700;
-}
 
 @import "tailwindcss";
 
