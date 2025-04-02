@@ -350,6 +350,7 @@ Measure and optimize:
    - ✅ API routes for CRUD operations (`src/app/api/calendar/`)
    - ✅ Kafka integration for event streaming (`src/lib/kafka/producers/calendar.ts`)
    - ✅ Authentication framework integration (`src/components/Providers.tsx`)
+   - ✅ Kafka topics creation (CALENDAR_EVENTS, CALENDAR_NOTIFICATIONS, CALENDAR_UPDATES, CALENDAR_DLQ)
 
 2. **Calendar Components**
    - ✅ Calendar visualization (`src/components/calendar/Calendar.tsx`)
@@ -430,25 +431,43 @@ Measure and optimize:
 
 Based on the implementation status, the revised next steps are:
 
-1. **Complete ONNX Integration**
+1. **Test Calendar Maps Implementation**
+   - Test the Leaflet integration with event locations
+   - Verify map marker interaction with calendar events
+   - Implement location-based filtering
+   - Optimize map performance with large event sets
+
+2. **Implement Calendar Event Handlers**
+   - Develop event handlers for Kafka topics
+   - Implement real-time updates for calendar UI
+   - Create transaction management for event operations
+   - Add error handling with retry mechanisms
+
+3. **Setup Notification Consumers**
+   - Implement notification consumer for CALENDAR_NOTIFICATIONS topic
+   - Create email and in-app notification delivery system
+   - Add user notification preferences
+   - Test notification delivery and tracking
+
+4. **Complete ONNX Integration**
    - Finalize the onnxIntegration.ts utility functions
    - Add model files to the public directory
    - Test inference with sample event data
    - Connect to relevant UI components
 
-2. **Implement Leaflet Map Integration**
+5. **Implement Leaflet Map Integration**
    - Create MapView component under src/components/calendar
    - Add geolocation support
    - Connect event locations to map markers
    - Implement filtering by location and distance
 
-3. **Finalize Stripe Payment System**
+6. **Finalize Stripe Payment System**
    - Complete the checkout session creation
    - Implement webhook handlers for payment events
    - Add payment status tracking in the UI
    - Test the complete payment flow with test cards
 
-4. **Enhance Testing Coverage**
+7. **Enhance Testing Coverage**
    - Add unit tests for all components
    - Create integration tests for Kafka messaging
    - Add end-to-end tests for critical user flows
