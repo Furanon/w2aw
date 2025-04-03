@@ -20,6 +20,7 @@ export interface FilterState {
   showPaidOnly: boolean;
   showFreeOnly: boolean;
   showJoinedOnly: boolean;
+  vectorSearch: string;
 }
 
 /**
@@ -32,6 +33,7 @@ export const EVENT_TYPES: EventType[] = [
   { id: 4, name: 'Drinks and Nightlife', color: '#9C27B0' },
   { id: 5, name: 'Food and Family', color: '#F44336' },
   { id: 6, name: 'Accommodation', color: '#795548' },
+  { id: 7, name: 'Transport and Tours', color: '#3F51B5' },
 ];
 
 /**
@@ -43,6 +45,7 @@ export const DEFAULT_FILTER_STATE: FilterState = {
   showPaidOnly: false,
   showFreeOnly: false,
   showJoinedOnly: false,
+  vectorSearch: '',
 };
 
 /**
