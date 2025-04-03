@@ -12,6 +12,8 @@ The Circus School Calendar Application is a comprehensive web application built 
 - Location-based filtering and mapping via Leaflet
 - ONNX integration for event recommendations
 - Comprehensive filtering system for various event types
+- Support for seven event categories in filters.ts including the newly added Transport & Tours category
+ (Arts & Crafts, Fitness, Education, Entertainment, Food & Drink, Business, Transport & Tours)
 
 ## 2. Directory Structure
 
@@ -121,6 +123,19 @@ The calendar API provides the following endpoints:
 
 ### Components
 
+The calendar system has been restructured to improve separation of concerns with the following component organization:
+
+```
+components/calendar/
+├── CalendarContainer.tsx    (main container)
+├── Calendar.tsx            (calendar-specific logic)
+├── MapView.tsx            (map-specific logic)
+├── FilterBar.tsx          (filtering UI)
+└── hooks/
+    ├── useCalendarEvents.ts (event management)
+    └── useEventFilters.ts   (filtering logic)
+```
+
 1. **VideoBackground.tsx**
    - Full-screen video background with blur overlay
    - Responsive design with mobile fallbacks
@@ -130,15 +145,27 @@ The calendar API provides the following endpoints:
    - React Big Calendar integration
    - Event color coding by type
    - Interactive event creation and editing
-   - Filter bar implementation
+   - Focused on calendar-specific rendering and interactions
 
-3. **TimeSlotModal.tsx**
-   - Form for creating and editing events
-   - Recurring event pattern selection
-   - Location selection
-   - Price setting for paid events
+3. **CalendarContainer.tsx**
+   - Main container component that coordinates Calendar and MapView
+   - Manages shared filter state between views
+   - Handles filter updates and event filtering
+   - Provides filtered events to child components
 
-4. **page.tsx**
+4. **MapView.tsx**
+   - Leaflet map integration with event locations
+   - Location-based visualization of events
+   - Interactive markers for event selection
+   - Map-specific filtering and view controls
+
+5. **FilterBar.tsx** 
+   - Comprehensive filtering UI for all event types
+   - Integrates with useEventFilters hook
+   - Support for all filter categories including the new Transport & Tours
+   - Advanced filtering options (price, capacity, time, etc.)
+
+6. **page.tsx**
    - Main calendar page layout
    - Component composition
    - SEO optimization
@@ -150,34 +177,367 @@ The calendar system is fully integrated with Kafka for real-time event processin
 
 ### Kafka Topics
 - **CALENDAR_EVENTS**: Main topic for event CRUD operations
+  - Partitioned by event type for optimized throughput
+  - Used for creating, updating, and deleting calendar events
+  - Contains full event payloads with metadata
+  - Consumed by calendar API and notification services
+
 - **CALENDAR_NOTIFICATIONS**: User notifications about events
+  - Contains user-targeted messages for upcoming events, changes, and cancellations
+  - Includes notification priority and delivery channel preferences
+  - Consumed by email service, push notification service, and in-app notification display
+
+- **CALENDAR_PARTICIPANT_EVENTS**: Registration and attendance tracking
+  - Records user registrations, cancellations, and attendance
+  - Used for capacity management and waitlist processing
+  - Contains payment status updates and confirmation data
+
 - **CALENDAR_UPDATES**: Real-time updates for UI clients
+  - Lightweight messages optimized for WebSocket delivery
+  - Contains only changed fields for efficient bandwidth usage
+  - Consumed by client-side WebSocket connections for live updates
+
 - **CALENDAR_DLQ**: Dead letter queue for failed messages
+  - Stores messages that failed processing after retry attempts
+  - Includes original message, error details, and timestamp
+  - Used by monitoring systems and recovery processes
 
-### Producer Implementation
-The `CalendarProducer` in `src/lib/kafka/producers/calendar.ts` handles publishing messages to Kafka with the following features:
-- Singleton pattern for efficient resource usage
-- Comprehensive error handling with retries
-- Transaction support for atomic operations
-- Message schema validation
-- Support for different event types (CREATE, UPDATE, DELETE, etc.)
+### Message Types and Schemas
 
-### Consumer Implementation
-The `CalendarConsumer` in `src/app/api/kafka/consumers/calendar/route.ts` processes incoming messages with:
-- Message type-based handling
-- Database integration for persistent storage
-- Error handling with DLQ support
-- Health monitoring integration
-- Transaction management
-
-### Message Schema
+#### Event Messages
 ```typescript
-interface CalendarMessage {
-  type: 'CREATE' | 'UPDATE' | 'DELETE' | 'REGISTER' | 'UNREGISTER';
+interface CalendarEventMessage {
+  type: 'CREATE' | 'UPDATE' | 'DELETE';
+  eventId: string;
+  userId: string; // Creator or modifier
+  timestamp: string;
+  data: {
+    title: string;
+    description: string;
+    startTime: string;
+    endTime: string;
+    location: {
+      id: string;
+      name: string;
+      coordinates?: [number, number]; // Lat/Long
+    };
+    eventType: EventType;
+    capacity: number;
+    price?: number;
+    instructorId?: string;
+    isRecurring: boolean;
+    recurringPattern?: {
+      frequency: 'DAILY' | 'WEEKLY' | 'MONTHLY';
+      interval: number;
+      endDate?: string;
+      daysOfWeek?: number[];
+    };
+    specificCriteria?: EventSpecificCriteria;
+  };
+  metadata: {
+    clientId: string;
+    correlationId: string;
+    version: string;
+  };
+}
+```
+
+#### Participant Messages
+```typescript
+interface ParticipantEventMessage {
+  type: 'REGISTER' | 'UNREGISTER' | 'WAITLIST' | 'CONFIRM' | 'ATTEND';
   eventId: string;
   userId: string;
   timestamp: string;
-  data: any; // Event-specific data payload
+  data: {
+    registrationId?: string;
+    paymentStatus?: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
+    paymentId?: string;
+    notes?: string;
+    waitlistPosition?: number;
+  };
+  metadata: {
+    clientId: string;
+    correlationId: string;
+    version: string;
+  };
+}
+```
+
+#### Notification Messages
+```typescript
+interface NotificationMessage {
+  type: 'EVENT_REMINDER' | 'EVENT_CHANGED' | 'EVENT_CANCELLED' | 'REGISTRATION_CONFIRMED' | 'PAYMENT_RECEIVED' | 'WAITLIST_POSITION_CHANGED';
+  eventId: string;
+  userId: string;
+  timestamp: string;
+  data: {
+    title: string;
+    message: string;
+    priority: 'LOW' | 'MEDIUM' | 'HIGH';
+    deliveryChannels: ('EMAIL' | 'PUSH' | 'IN_APP')[];
+    actionUrl?: string;
+    imageUrl?: string;
+  };
+  metadata: {
+    clientId: string;
+    correlationId: string;
+    version: string;
+  };
+}
+```
+
+### Producer Implementation
+The `CalendarProducer` in `src/lib/kafka/producers/calendar.ts` handles publishing messages to Kafka with the following features:
+
+- **Singleton pattern** for efficient resource usage
+- **Message validation** against schemas with TypeScript and runtime validation
+- **Transaction support** for atomic operations across multiple topics
+- **Retry logic** with exponential backoff for temporary failures
+- **Message enrichment** with standard metadata (clientId, correlationId, timestamp)
+- **Batching optimization** for high-throughput operations (mass updates)
+- **Compression** for efficient network usage with large event payloads
+- **Headers** for message filtering and routing without deserializing the payload
+
+Implementation examples:
+
+```typescript
+// Publishing an event creation message
+await calendarProducer.publishEventMessage({
+  type: 'CREATE',
+  eventId: newEvent.id,
+  userId: currentUser.id,
+  timestamp: new Date().toISOString(),
+  data: eventData,
+  metadata: {
+    clientId: 'calendar-web-app',
+    correlationId: requestId,
+    version: '1.0'
+  }
+});
+
+// Publishing a batch of participant registrations
+await calendarProducer.publishParticipantBatch(
+  registrations.map(reg => ({
+    type: 'REGISTER',
+    eventId: reg.eventId,
+    userId: reg.userId,
+    timestamp: new Date().toISOString(),
+    data: {
+      registrationId: reg.id,
+      paymentStatus: reg.paymentStatus
+    },
+    metadata: {/* metadata */}
+  }))
+);
+```
+
+### Consumer Implementation
+The `CalendarConsumer` in `src/app/api/kafka/consumers/calendar/route.ts` processes incoming messages with:
+
+- **Type-based handlers** for different message categories
+- **Database transaction management** for consistent state updates
+- **Concurrent processing** of non-conflicting events
+- **Ordered processing** guarantees for messages with the same eventId
+- **Idempotent operations** to handle potential duplicate messages
+- **Dead letter queue** forwarding for failed messages
+- **Consumer lag monitoring** for system health checks
+
+Implementation details:
+
+```typescript
+// Message handler registry
+const messageHandlers = {
+  'CREATE': handleEventCreation,
+  'UPDATE': handleEventUpdate,
+  'DELETE': handleEventDeletion,
+  'REGISTER': handleParticipantRegistration,
+  'UNREGISTER': handleParticipantCancellation,
+  // Additional handlers...
+};
+
+// Sample handler implementation
+async function handleEventUpdate(message: CalendarEventMessage): Promise<void> {
+  // Extract message data
+  const { eventId, data, metadata } = message;
+  
+  // Start database transaction
+  const transaction = await db.transaction();
+  
+  try {
+    // Get existing event
+    const existingEvent = await db.calendar_events.findUnique({
+      where: { id: eventId },
+      transaction
+    });
+    
+    if (!existingEvent) {
+      throw new Error(`Event ${eventId} not found for update`);
+    }
+    
+    // Update event
+    const updatedEvent = await db.calendar_events.update({
+      where: { id: eventId },
+      data: transformKafkaMessageToDbFormat(data),
+      transaction
+    });
+    
+    // Update related records if needed
+    if (data.capacity !== existingEvent.capacity) {
+      await updateWaitlistPositions(eventId, data.capacity, transaction);
+    }
+    
+    // Commit transaction
+    await transaction.commit();
+    
+    // Publish notifications if needed
+    if (shouldNotifyParticipants(existingEvent, data)) {
+      await notifyParticipantsAboutUpdate(eventId, data);
+    }
+    
+    // Log successful processing
+    logger.info(`Event ${eventId} updated successfully`, { correlationId: metadata.correlationId });
+  } catch (error) {
+    // Rollback transaction
+    await transaction.rollback();
+    
+    // Handle error (throw for DLQ or retry)
+    logger.error(`Failed to update event ${eventId}`, { error, correlationId: metadata.correlationId });
+    throw error;
+  }
+}
+```
+
+### Health Monitoring
+The calendar consumer health is monitored through the `/api/kafka/consumers/health` endpoint, which provides:
+
+- **Consumer lag metrics** by topic and partition
+- **Message processing rates** and throughput statistics
+- **Error rates** and types for diagnostic purposes
+- **Rebalance events** tracking for partition assignment changes
+- **DLQ volume** monitoring with error categorization
+- **Consumer instance status** (active, rebalancing, stopped)
+
+Health check implementation:
+
+```typescript
+// Health check endpoint
+export async function GET(): Promise<Response> {
+  try {
+    const health = await calendarConsumerManager.getHealth();
+    
+    // Determine overall health status
+    const status = determineHealthStatus(health);
+    
+    // Return health data
+    return new Response(JSON.stringify({
+      status,
+      timestamp: new Date().toISOString(),
+      consumers: {
+        calendar: {
+          lag: health.lag,
+          throughput: health.throughput,
+          errorRate: health.errorRate,
+          dlqVolume: health.dlqVolume,
+          partitions: health.partitions.map(p => ({
+            partition: p.id,
+            lag: p.lag,
+            lastProcessed: p.lastProcessed
+          }))
+        }
+      }
+    }), {
+      status: status === 'HEALTHY' ? 200 : 503,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({
+      status: 'ERROR',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+```
+
+### Error Handling and DLQ Process
+The calendar system implements a robust error handling strategy for Kafka messages:
+
+1. **Retry Mechanism**:
+   - Transient errors (network, database timeouts) are retried automatically
+   - Configurable retry count and backoff periods in kafka.ts config
+   - Separate handling for different error categories
+
+2. **Error Classification**:
+   - **Transient errors**: Temporary issues that can be resolved with retries
+   - **Data validation errors**: Issues with message format or content
+   - **Business logic errors**: Valid messages that violate business rules
+   - **Fatal errors**: Unrecoverable system issues
+
+3. **Dead Letter Queue (DLQ) Processing**:
+   - Failed messages are published to CALENDAR_DLQ after retry exhaustion
+   - Original message is preserved with error details and timestamps
+   - Administrative UI for viewing and managing DLQ messages
+   - Manual reprocessing capability for fixed issues
+
+4. **Recovery Workflows**:
+   - Automated periodic retry of certain DLQ message categories
+   - Notification to administrators for critical failures
+   - Reconciliation process for resolving data inconsistencies
+   - Transaction isolation to prevent partial updates
+
+5. **Error Reporting**:
+   - Structured error logs with correlation IDs
+   - Error aggregation in monitoring dashboard
+   - Alerting based on error volume and patterns
+   - Performance impact analysis of error handling
+
+Implementation example for DLQ handling:
+
+```typescript
+// Send message to DLQ
+async function sendToDLQ(
+  originalMessage: KafkaMessage, 
+  error: Error, 
+  retryCount: number
+): Promise<void> {
+  await dlqProducer.send({
+    topic: KAFKA_TOPICS.CALENDAR_DLQ,
+    messages: [{
+      key: originalMessage.key,
+      value: JSON.stringify({
+        originalMessage: JSON.parse(originalMessage.value.toString()),
+        error: {
+          message: error.message,
+          stack: error.stack,
+          code: error.code || 'UNKNOWN'
+        },
+        metadata: {
+          retryCount,
+          timestamp: new Date().toISOString(),
+          originalTopic: originalMessage.topic,
+          originalPartition: originalMessage.partition,
+          originalOffset: originalMessage.offset
+        }
+      }),
+      headers: {
+        'error-type': error.name || 'Unknown',
+        'retry-count': retryCount.toString(),
+        'original-topic': originalMessage.topic
+      }
+    }]
+  });
+  
+  // Log DLQ event
+  logger.warn(`Message sent to DLQ: ${error.message}`, {
+    topic: originalMessage.topic,
+    partition: originalMessage.partition,
+    offset: originalMessage.offset,
+    key: originalMessage.key?.toString()
+  });
 }
 ```
 
@@ -186,6 +546,8 @@ interface CalendarMessage {
 2. **Real-time Updates**: Client-side updates via WebSockets using Kafka messages
 3. **Notifications**: Email and in-app notifications triggered by Kafka events
 4. **Health Monitoring**: Calendar consumer health is tracked in the monitoring system
+5. **Analytics Pipeline**: Event data is fed to analytics systems for reporting
+6. **External Systems**: Integration with third-party calendars through Kafka connectors
 
 ## 5. Configuration
 
@@ -367,9 +729,10 @@ Measure and optimize:
 
 1. **High Priority**
    - ❌ ONNX model integration for event recommendations
-   - ❌ Leaflet map integration below calendar
+   - ✅ Leaflet map integration with MapView component
    - ❌ Complete Stripe payment flow and webhook handling
-   - ❌ FilterBar implementation for event types
+   - ✅ FilterBar implementation for event types with comprehensive category support
+   - ✅ Support for Transport & Tours category in filters.ts
 
 2. **Medium Priority**
    - ❌ Recurring event modification (update series vs. single instance)
@@ -443,7 +806,9 @@ Based on the implementation status, the revised next steps are:
    - Create transaction management for event operations
    - Add error handling with retry mechanisms
 
-3. **Setup Notification Consumers**
+## 10. Filter System Implementation
+
+The calendar application implements
    - Implement notification consumer for CALENDAR_NOTIFICATIONS topic
    - Create email and in-app notification delivery system
    - Add user notification preferences
@@ -455,11 +820,12 @@ Based on the implementation status, the revised next steps are:
    - Test inference with sample event data
    - Connect to relevant UI components
 
-5. **Implement Leaflet Map Integration**
-   - Create MapView component under src/components/calendar
-   - Add geolocation support
-   - Connect event locations to map markers
-   - Implement filtering by location and distance
+5. **Completed: Leaflet Map Integration**
+   - ✅ Created MapView component under components/calendar
+   - ✅ Added geolocation support
+   - ✅ Connected event locations to map markers
+   - ✅ Implemented filtering by location and distance
+   - ❌ Optimize map performance with large datasets
 
 6. **Finalize Stripe Payment System**
    - Complete the checkout session creation

@@ -36,6 +36,28 @@ The application follows a modern web architecture:
 ┌─────────────┐       ┌──────────────┐       ┌────────────────┐
 │   Leaflet   │       │  NextAuth    │       │ Kafka Producers│
 └─────────────┘       └──────────────┘       └────────────────┘
+      ▲
+      │
+      │
+┌─────────────────────────────────────────────────────┐
+│ Calendar Components                                 │
+│                                                     │
+│  ┌────────────┐     ┌─────────┐     ┌──────────┐    │
+│  │ Calendar   │     │ MapView │     │ FilterBar│    │
+│  └────────────┘     └─────────┘     └──────────┘    │
+│          ▲               ▲               ▲          │
+│          │               │               │          │
+│          └───────┬───────┘               │          │
+│                  │                       │          │
+│          ┌───────▼───────┐               │          │
+│          │CalendarContainer◀─────────────┘          │
+│          └───────────────┘                          │
+│                  ▲                                  │
+│                  │                                  │
+│        ┌─────────┴─────────┐                        │
+│        │Calendar Event Hooks│                        │
+│        └───────────────────┘                        │
+└─────────────────────────────────────────────────────┘
                              │                       │
                              │                       │
                              ▼                       ▼
@@ -57,6 +79,7 @@ The application follows a modern web architecture:
 - Recurring event support with flexible patterns
 - Capacity management and booking system
 - Participant tracking and registration
+- Comprehensive filtering with seven event categories (Arts & Crafts, Fitness, Education, Entertainment, Food & Drink, Business, Transport & Tours)
 
 ### Map Integration
 - Location-based event discovery
@@ -64,6 +87,7 @@ The application follows a modern web architecture:
 - Custom color coding by event type
 - Marker clustering for dense areas
 - Event filtering by type, location, and status
+- Dedicated MapView component with location-based filtering
 
 ### Preference System
 - Course/event preferences
@@ -150,6 +174,8 @@ CREATE TABLE calendar_events (
   payment_required BOOLEAN DEFAULT false,
   payment_amount DECIMAL(10, 2),
   payment_currency VARCHAR(3) DEFAULT 'USD',
+  event_type VARCHAR(50) NOT NULL, /* Arts & Crafts, Fitness, Education, Entertainment, Food & Drink, Business, Transport & Tours */
+  event_specific_criteria JSONB, /* Stores filter-specific data for each event type */
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -187,7 +213,7 @@ CREATE TABLE user_course_preferences (
   preferred_time_end TIME,
   preferred_days INTEGER[],
   location_id INTEGER REFERENCES locations(id),
-  activity_type VARCHAR(255),
+  activity_type VARCHAR(255), /* Types: Arts & Crafts, Fitness, Education, Entertainment, Food & Drink, Business, Transport & Tours */
   max_price NUMERIC,
   social_data JSONB,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -342,7 +368,6 @@ CREATE TABLE notification_preferences (
 ```
 
 ## Core Components
-
 ### Service Layer
 
 The service layer manages business logic and data operations:
@@ -352,25 +377,174 @@ The service layer manages business logic and data operations:
 - `BusinessPreferenceService`: Manages business venue preferences
 - `PersonPreferenceService`: Handles instructor/user preferences
 - `LocationPreferenceService`: Manages location and proximity preferences
-
+- `TransportPreferenceService`: Handles transport and tour preferences
+- `LocationPreferenceService`: Manages location and proximity preferences
 ### Kafka Integration
 
-Kafka is used for real-time event processing:
+Kafka is used for real-time event processing and messaging throughout the application, ensuring reliable communication between components.
 
-- `PreferenceProducer`: Publishes preference events
-- `NotificationConsumer`: Processes preference events and creates notifications
-- `RecommendationConsumer`: Generates recommendations based on preferences
+#### Kafka Topics
+
+The application uses specialized topics for different domains:
+
+**Calendar Topics:**
+- `calendar-events`: Primary topic for calendar event creation and deletion
+- `calendar-updates`: Handles updates to existing calendar events
+- `calendar-notifications`: Manages event-related notifications like registrations and reminders
+- `calendar-dlq`: Dead Letter Queue for handling failed calendar message processing
+
+**Notification Topics:**
+- `notifications`: Primary topic for sending notifications
+- `notification-results`: Tracks notification delivery outcomes
+- `notification-errors`: Captures notification delivery failures
+
+**AI and Analytics Topics:**
+- `ai-jobs`, `ai-results`, `ai-dlq`: Handle AI processing tasks and results
+- `analytics-jobs`, `analytics-results`, `analytics-dlq`: Manage analytics processing
+
+**Additional Domain Topics:**
+- `marketplace-jobs`, `marketplace-results`, `marketplace-dlq`: Marketplace operations
+- `maintenance-jobs`, `maintenance-results`, `maintenance-dlq`: System maintenance tasks
+- `auth-jobs`, `auth-results`, `auth-dlq`: Authentication-related events
+- `visualization-updates`, `visualization-results`, `visualization-dlq`: UI visualization data
+- `places-jobs`, `places-results`, `places-dlq`: Location and place-based operations
+
+#### Kafka Producers
+
+The system implements specialized producers for different domains:
+
+**Calendar Producer:**
+- Publishes events with retry logic (maximum 3 retries with exponential backoff)
+- Handles various event types: CREATE, UPDATE, DELETE, REGISTER, UNREGISTER, PAYMENT, REMINDER
+- Implements Dead Letter Queue (DLQ) handling for failed message publishing
+- Ensures message headers include metadata like message type and timestamp
+
+**Producer Methods:**
+- `publishEventCreation`: Announces new calendar events
+- `publishEventUpdate`: Broadcasts changes to existing events
+- `publishEventDeletion`: Notifies when events are removed
+- `publishUserRegistration`: Announces when users join events
+- `publishUserUnregistration`: Informs when users leave events
+- `publishPaymentConfirmation`: Confirms successful payments
+- `publishEventReminder`: Sends reminders about upcoming events
+
+#### Kafka Consumers
+
+The application uses domain-specific consumers with specialized error handling:
+
+**Calendar Consumer:**
+- Processes messages from calendar-related topics
+- Implements error handling and DLQ for failed messages
+- Monitors health metrics for consumer groups
+- Handles event creation, updates, deletions, registrations, and unregistrations
+
+**Consumer Configuration:**
+- Different consumer groups have specialized settings:
+  - Notification consumers: Faster processing (2s max wait)
+  - AI consumers: Larger message size support (5MB)
+  - Calendar consumers: Balanced settings (3s max wait, 2MB max size)
+  - DLQ processors: Manual commit mode, larger message size (10MB)
+
+#### Message Schemas
+
+**Calendar Messages:**
+```typescript
+interface CalendarMessage {
+  type: 'CREATE' | 'UPDATE' | 'DELETE' | 'REGISTER' | 'UNREGISTER' | 'PAYMENT' | 'REMINDER';
+  eventId: string;
+  userId?: string;
+  timestamp: string;
+  data: any; // Event-specific data
+}
+```
+
+#### Health Monitoring
+
+The system includes a comprehensive consumer health monitoring system:
+- Tracks message processing metrics (count, timing, errors)
+- Monitors consumer lag
+- Provides health status (healthy, degraded, unhealthy)
+- Automatic alerts when consumers fail or slow down
+- REST endpoints for health status checking
+- Configurable thresholds for health status determination
+
+#### Error Handling and DLQ
+
+The application implements robust error handling:
+- Failed messages are sent to dedicated Dead Letter Queues
+- DLQ messages include the original payload, error information, and timestamps
+- Administrative API endpoints to reprocess DLQ messages
+- Configurable retry mechanisms with exponential backoff
+- Error logging with detailed context for troubleshooting
+- Circuit breaker patterns to prevent cascading failures
 
 ### API Routes
 
-The application exposes several API endpoints:
+The application exposes a comprehensive set of RESTful API endpoints:
+
+#### Calendar API Endpoints
+
+**Calendar CRUD Operations** - `/api/calendar`
+- `GET`: Fetch calendar events with filtering options:
+  - Query parameters: `start_date`, `end_date`, `type`, `location_id`, `query`
+  - Returns events with location and instructor details
+- `POST`: Create a new calendar event
+  - Validates event data (title, dates, capacity, etc.)
+  - Publishes event creation to Kafka
+  - Returns the created event with status 201
+- `PUT`: Batch update multiple events
+  - Accepts an array of event objects with updates
+  - Publishes each update to Kafka
+  - Returns results of all update operations
+- `DELETE`: Delete events (supports batch deletion)
+  - Accepts comma-separated list of event IDs
+  - Publishes deletion events to Kafka
+  - Returns list of successfully deleted events
+
+**Participant Management** - `/api/calendar/participants`
+- `GET`: Fetch participants for a specific event
+  - Requires event creator or admin authorization
+  - Returns list of participants with user details
+- `POST`: Register for an event
+  - Verifies event capacity
+  - Handles payment requirements for paid events
+  - Publishes registration events to Kafka
+  - Creates notification for successful registration
+- `DELETE`: Unregister from an event
+  - Handles refund eligibility for paid events
+  - Publishes unregistration events to Kafka
+  - Creates notification for unregistration confirmation
+
+#### Kafka Management Endpoints
+
+**Consumer Control** - `/api/kafka/consumers/calendar`
+- `GET`: Check consumer status and health
+  - Query parameter `health=true` returns detailed health metrics
+- `POST`: Control consumer operation
+  - Action `process-dlq`: Reprocess failed messages from DLQ
+  - Action `pause`: Temporarily stop processing
+  - Action `resume`: Resume processing
+
+**General Kafka Management** - `/api/kafka-consumer`
+- Endpoints for overall Kafka management
+- Consumer metrics and status reporting
+- Kafka cluster health monitoring
+
+#### Notification Endpoints
+
+**Notification Management** - `/api/notifications`
+- `GET`: Fetch user notifications
+  - Filters for read/unread status
+  - Pagination support
+- `POST`: Mark notifications as read/unread
+- `GET /api/notifications/[id]`: Get specific notification
+
+#### Other API Endpoints
 
 - `/api/preferences`: Manage user preferences
-- `/api/calendar`: Calendar event operations
 - `/api/maps`: Map-related functionality
 - `/api/recommendations`: Access personalized recommendations
-- `/api/notifications`: Manage user notifications
-
+- `/api/filters`: Event filtering and categorization including Transport & Tours
 ### ML Components
 
 Machine learning is used for personalized recommendations:
@@ -443,6 +617,8 @@ Vector storage enables:
 3. Add Kafka producer events
 4. Create API endpoints
 5. Add UI components
+6. Update filters.ts with the new category
+7. Implement event-specific criteria in FilterBar.tsx
 
 ### Enhancing Recommendations
 1. Update feature extraction in PreferenceService
