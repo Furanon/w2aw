@@ -157,6 +157,202 @@ const FilterBar: React.FC<FilterBarProps> = ({
               </label>
             </div>
           </div>
+          
+          {/* Time and Day Preferences */}
+          <div className="mt-6">
+            <h4 className="font-medium mb-2 text-gray-700">Time and Day Preferences</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Days of Week */}
+              <div>
+                <h5 className="text-sm font-medium mb-2 text-gray-600">Days of Week</h5>
+                <div className="flex flex-wrap gap-2">
+                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, index) => (
+                    <button
+                      key={day}
+                      className={`px-3 py-1 rounded-full text-xs transition-colors ${
+                        filters.eventSpecificCriteria?.daysOfWeek?.includes(index + 1)
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                      onClick={() => {
+                        const currentDays = filters.eventSpecificCriteria?.daysOfWeek || [];
+                        const dayValue = index + 1;
+                        const newDays = currentDays.includes(dayValue)
+                          ? currentDays.filter(d => d !== dayValue)
+                          : [...currentDays, dayValue];
+                        
+                        onFilterChange({
+                          eventSpecificCriteria: {
+                            ...filters.eventSpecificCriteria,
+                            daysOfWeek: newDays
+                          }
+                        });
+                      }}
+                    >
+                      {day}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Time Range */}
+              <div>
+                <h5 className="text-sm font-medium mb-2 text-gray-600">Time Range</h5>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Start Time</label>
+                    <input
+                      type="time"
+                      value={filters.eventSpecificCriteria?.timeStart || ''}
+                      onChange={(e) => onFilterChange({
+                        eventSpecificCriteria: {
+                          ...filters.eventSpecificCriteria,
+                          timeStart: e.target.value
+                        }
+                      })}
+                      className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">End Time</label>
+                    <input
+                      type="time"
+                      value={filters.eventSpecificCriteria?.timeEnd || ''}
+                      onChange={(e) => onFilterChange({
+                        eventSpecificCriteria: {
+                          ...filters.eventSpecificCriteria,
+                          timeEnd: e.target.value
+                        }
+                      })}
+                      className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Availability and Capacity */}
+          <div className="mt-6">
+            <h4 className="font-medium mb-2 text-gray-700">Availability and Capacity</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Availability */}
+              <div>
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={filters.showAvailableOnly}
+                    onChange={() => 
+                      onFilterChange({ 
+                        showAvailableOnly: !filters.showAvailableOnly 
+                      })
+                    }
+                    className="mr-2 h-4 w-4"
+                  />
+                  <span>Available Only</span>
+                </label>
+              </div>
+              
+              {/* Capacity Range */}
+              <div>
+                <h5 className="text-sm font-medium mb-2 text-gray-600">Capacity Range</h5>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Min Capacity</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={filters.eventSpecificCriteria?.minCapacity || ''}
+                      onChange={(e) => onFilterChange({
+                        eventSpecificCriteria: {
+                          ...filters.eventSpecificCriteria,
+                          minCapacity: e.target.value ? parseInt(e.target.value) : undefined
+                        }
+                      })}
+                      className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      placeholder="Min"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Max Capacity</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={filters.eventSpecificCriteria?.maxCapacity || ''}
+                      onChange={(e) => onFilterChange({
+                        eventSpecificCriteria: {
+                          ...filters.eventSpecificCriteria,
+                          maxCapacity: e.target.value ? parseInt(e.target.value) : undefined
+                        }
+                      })}
+                      className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      placeholder="Max"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Price Range */}
+              <div className="md:col-span-2">
+                <h5 className="text-sm font-medium mb-2 text-gray-600">Price Range</h5>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Min Price ($)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={filters.eventSpecificCriteria?.minPrice || ''}
+                      onChange={(e) => onFilterChange({
+                        eventSpecificCriteria: {
+                          ...filters.eventSpecificCriteria,
+                          minPrice: e.target.value ? parseFloat(e.target.value) : undefined
+                        }
+                      })}
+                      className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Max Price ($)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={filters.eventSpecificCriteria?.maxPrice || ''}
+                      onChange={(e) => onFilterChange({
+                        eventSpecificCriteria: {
+                          ...filters.eventSpecificCriteria,
+                          maxPrice: e.target.value ? parseFloat(e.target.value) : undefined
+                        }
+                      })}
+                      className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Reset Filters Button */}
+          <div className="mt-6 text-right">
+            <button
+              onClick={() => onFilterChange({
+                typeIds: [],
+                locations: [],
+                vectorSearch: '',
+                showPaidOnly: false,
+                showFreeOnly: false,
+                showJoinedOnly: false,
+                showAvailableOnly: false,
+                eventSpecificCriteria: {}
+              })}
+              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors"
+            >
+              Reset All Filters
+            </button>
+          </div>
         </div>
       </div>
     </Container>
