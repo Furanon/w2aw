@@ -14,9 +14,8 @@ import LandingPageCalendar from "@/components/landing/LandingPageCalendar";
 import { FilterState, DEFAULT_FILTER_STATE } from "@/types/filters";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { KAFKA_TOPICS } from "@/lib/config/kafka";
-import { KafkaService } from "@/lib/services/kafkaService";
 import { EventType } from "@/lib/events/schemas/baseEvent";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { useSession } from "next-auth/react";
 
 // Import MapView component with dynamic loading to avoid SSR issues
@@ -32,9 +31,6 @@ const MapView = dynamic(
     )
   }
 );
-
-// Initialize Kafka service singleton
-const kafkaService = KafkaService.getInstance();
 
 // Define interfaces for API responses
 interface EventLocation {
@@ -95,10 +91,7 @@ export default function Home() {
   const [isSubscribed, setIsSubscribed] = useState(false);
   
   // Refs for cleanup
-  const unsubscribeRef = useRef<(() => Promise<void>) | null>(null);
-  
-  // Toast notifications
-  const { toast } = useToast();
+  const consumerIdRef = useRef<string | null>(null);
   
   // User session for auth
   const { data: session } = useSession();
@@ -210,18 +203,26 @@ export default function Home() {
     // Publish filter update to Kafka if user is authenticated
     if (session?.user?.id) {
       try {
-        const updateMessage = kafkaService.createCalendarUpdateMessage(
-          { ...filters, ...newFilters },
-          session.user.id
-        );
-        
-        kafkaService.publishMessage(KAFKA_TOPICS.CALENDAR_UPDATES, updateMessage)
-          .catch(error => {
-            console.error('Failed to publish filter update to Kafka:', error);
-            // Non-critical, don't block UI
-          });
+        // Create and publish event using the API
+        fetch('/api/events', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            eventType: EventType.CALENDAR_UPDATED,
+            timestamp: new Date().toISOString(),
+            data: {
+              filters: { ...filters, ...newFilters },
+              userId: session.user.id
+            }
+          }),
+        }).catch(error => {
+          console.error('Failed to publish filter update:', error);
+          // Non-critical, don't block UI
+        });
       } catch (error) {
-        console.error('Error creating filter update message:', error);
+        console.error('Error creating filter update:', error);
       }
     }
   }, [filters, session?.user?.id]);
@@ -236,8 +237,7 @@ export default function Home() {
     console.log('Selected event:', event);
     
     // Show a toast notification for the selected event
-    toast({
-      title: event.title,
+    toast(event.title, {
       description: `${event.description || 'No description'} at ${event.location?.name || 'unknown location'}`,
       duration: 5000,
     });
@@ -245,23 +245,31 @@ export default function Home() {
     // Publish visualization update to Kafka if user is authenticated
     if (session?.user?.id) {
       try {
-        const visualizationMessage = kafkaService.createVisualizationUpdateMessage(
-          'map',
-          'viewed',
-          { 
-            eventId: event.id, 
-            userId: session.user.id,
-            timestamp: new Date().toISOString()
-          }
-        );
-        
-        kafkaService.publishMessage(KAFKA_TOPICS.VISUALIZATION_UPDATES, visualizationMessage)
-          .catch(error => {
-            console.error('Failed to publish visualization update to Kafka:', error);
-            // Non-critical, don't block UI
-          });
+        // Create and publish visualization event using the API
+        fetch('/api/events', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            eventType: EventType.VISUALIZATION_UPDATED,
+            timestamp: new Date().toISOString(),
+            data: {
+              visualizationType: 'map',
+              action: 'viewed',
+              payload: {
+                eventId: event.id,
+                userId: session.user.id,
+                timestamp: new Date().toISOString()
+              }
+            }
+          }),
+        }).catch(error => {
+          console.error('Failed to publish visualization update:', error);
+          // Non-critical, don't block UI
+        });
       } catch (error) {
-        console.error('Error creating visualization update message:', error);
+        console.error('Error creating visualization update:', error);
       }
     }
   }, [session?.user?.id, toast]);
@@ -271,13 +279,11 @@ export default function Home() {
    * Calls the API and updates local state on success
    * 
    * @param eventId - ID of the event to join
-   */
   const handleJoinEvent = useCallback(async (eventId: string) => {
     if (!session?.user) {
-      toast({
-        title: "Authentication required",
+      toast.error("Authentication required", {
         description: "Please sign in to join events",
-        variant: "destructive",
+      });
       });
       return;
     }
@@ -312,18 +318,15 @@ export default function Home() {
       );
       
       // Show success notification
-      toast({
-        title: "Success!",
+      toast.success("Success!", {
         description: "You have successfully joined the event",
       });
     } catch (error) {
       console.error('Error joining event:', error);
-      toast({
-        title: "Error",
+      console.error('Error joining event:', error);
+      toast.error("Error", {
         description: error instanceof Error ? error.message : 'Failed to join event',
-        variant: "destructive",
       });
-    }
   }, [session?.user, toast]);
   
   /**
@@ -407,32 +410,88 @@ export default function Home() {
     // Only set up subscription once
     if (isSubscribed) return;
     
-    // Subscribe to Kafka topics
+    // Set up event source for Kafka message updates
     const setupSubscription = async () => {
       try {
-        // Subscribe to relevant topics
-        const unsubscribe = await kafkaService.subscribeToTopics(
-          [KAFKA_TOPICS.CALENDAR_EVENTS, KAFKA_TOPICS.CALENDAR_UPDATES],
-          handleKafkaMessage
-        );
+        // Create a consumer using the API
+        const response = await fetch('/api/kafka/consumers', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            topic: [KAFKA_TOPICS.CALENDAR_EVENTS, KAFKA_TOPICS.CALENDAR_UPDATES].join(','),
+            filter: {}
+          }),
+        });
         
-        // Store unsubscribe function for cleanup
-        unsubscribeRef.current = unsubscribe;
+        if (!response.ok) {
+          throw new Error('Failed to create Kafka consumer');
+        }
+        
+        const { consumerId } = await response.json();
+        consumerIdRef.current = consumerId;
+        
+        // Set up polling for messages
+        const messagePolling = setInterval(async () => {
+          if (!consumerIdRef.current) return;
+          
+          try {
+            const messagesResponse = await fetch(`/api/kafka/consumers/${consumerIdRef.current}`, {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            });
+            
+            if (messagesResponse.ok) {
+              const data = await messagesResponse.json();
+              if (data && data.messages && Array.isArray(data.messages)) {
+                // Process each message
+                data.messages.forEach((message: any) => {
+                  handleKafkaMessage(message);
+                });
+              }
+            }
+          } catch (error) {
+            console.error('Error polling Kafka messages:', error);
+          }
+        }, 5000); // Poll every 5 seconds
+        
         setIsSubscribed(true);
-        console.log('Subscribed to Kafka topics successfully');
+        console.log('Subscribed to Kafka topics successfully with consumer ID:', consumerId);
+        
+        // Return cleanup function for the interval
+        return () => {
+          clearInterval(messagePolling);
+        };
       } catch (error) {
         console.error('Failed to subscribe to Kafka topics:', error);
         // Non-critical, continue with basic functionality
       }
     };
     
-    setupSubscription();
+    const cleanup = setupSubscription();
     
     // Cleanup function to unsubscribe from Kafka
     return () => {
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current().catch(error => {
-          console.error('Error unsubscribing from Kafka:', error);
+      // Clean up the polling interval if it was set
+      if (cleanup && typeof cleanup === 'function') {
+        cleanup();
+      }
+      
+      // Delete the consumer if it was created
+      if (consumerIdRef.current) {
+        fetch(`/api/kafka/consumers/${consumerIdRef.current}/control`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'RESET'
+          }),
+        }).catch(error => {
+          console.error('Error removing Kafka consumer:', error);
         });
       }
     };
@@ -579,6 +638,26 @@ export default function Home() {
               >
                 Explore Maps
               </Link>
+            </div>
+          </div>
+        </ErrorBoundary>
+      </div>
+      
+      {/* Temporary Toast Test Component - Remove after testing */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 mt-6 mb-12">
+        <ErrorBoundary FallbackComponent={ErrorFallback}>
+          <div className="bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-xl">
+            <div className="p-1">
+              {/* Dynamically import the test component to avoid affecting production */}
+              {process.env.NODE_ENV !== 'production' && (
+                <div className="p-4">
+                  {/* @ts-expect-error - Dynamic import */}
+                  {dynamic(() => import('@/components/ToastTestComponent'), {
+                    loading: () => <div className="p-4">Loading Toast Tester...</div>,
+                    ssr: false
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </ErrorBoundary>

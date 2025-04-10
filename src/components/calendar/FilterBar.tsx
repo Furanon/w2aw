@@ -6,9 +6,8 @@ import { Button } from "@/components/ui/button";
 import { FilterState, EVENT_TYPES, SPECIAL_STATUS_COLORS, PAYMENT_STATUS_TYPES } from '@/types/filters';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion as m, AnimatePresence } from "framer-motion";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { AnimatedContainer } from "@/components/ui/animated-container"; 
 import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
@@ -280,7 +279,12 @@ const FilterBar: React.FC<FilterBarProps> = ({
 
   // Render method
   return (
-    <AnimatedContainer className="mb-6">
+    <m.div 
+      className="mb-6"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+    >
       <Card>
         <CardContent className="p-4">
           {/* Header with title and filter count */}
@@ -289,14 +293,14 @@ const FilterBar: React.FC<FilterBarProps> = ({
               <Filter className="mr-2 h-5 w-5" /> 
               Filters 
               {activeFilterCount > 0 && (
-                <motion.span
+                <m.span
                   className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-500 px-2 text-xs font-medium text-white"
                   initial={{ scale: 0.8, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ duration: 0.3 }}
                 >
                   {activeFilterCount}
-                </motion.span>
+                </m.span>
               )}
               <TooltipProvider>
                 <Tooltip>
@@ -382,7 +386,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
           
           <AnimatePresence mode="wait">
             {showFilters && (
-              <motion.div
+              <m.div
                 id="filter-panel"
                 variants={containerVariants}
                 initial="hidden"
@@ -405,7 +409,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                   
                   {/* Basic Filters Tab */}
                   <TabsContent value="basic" className="pt-4">
-                    <motion.div
+                    <m.div
                       variants={itemVariants}
                       className="space-y-6"
                     >
@@ -417,7 +421,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                         </h4>
                         <div className="flex flex-wrap gap-2">
                           {EVENT_TYPES.map(type => (
-                            <motion.button
+                            <m.button
                               key={type.id}
                               className={`px-3 py-1 rounded-full text-sm flex items-center ${
                                 filters.typeIds.includes(type.id)
@@ -437,7 +441,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                                 style={{ backgroundColor: type.color }}
                               ></span>
                               {type.name}
-                            </motion.button>
+                            </m.button>
                           ))}
                         </div>
                       </div>
@@ -451,12 +455,13 @@ const FilterBar: React.FC<FilterBarProps> = ({
                         <div className="flex flex-wrap gap-2">
                           {availableLocations.length > 0 ? (
                             availableLocations.map(location => (
-                              <motion.button
+                              <m.button
                                 key={location}
                                 className={`px-3 py-1 rounded-full text-sm ${
                                   filters.locations.includes(location)
                                     ? 'bg-blue-600 text-white'
                                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                }`}
                                 onClick={() => {
                                   if (onToggleLocation) {
                                     handleFilterOperation(() => onToggleLocation(location));
@@ -470,7 +475,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                                 aria-pressed={filters.locations.includes(location)}
                               >
                                 {location}
-                              </motion.button>
+                              </m.button>
                             ))
                           ) : (
                             <p className="text-gray-500 text-sm italic">No locations available</p>
@@ -550,12 +555,12 @@ const FilterBar: React.FC<FilterBarProps> = ({
                           </div>
                         </div>
                       </div>
-                    </motion.div>
+                    </m.div>
                   </TabsContent>
                   
                   {/* Advanced Filters Tab */}
                   <TabsContent value="advanced" className="pt-4">
-                    <motion.div
+                    <m.div
                       variants={itemVariants}
                       className="space-y-6"
                     >
@@ -567,7 +572,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                         </h4>
                         <div className="flex flex-wrap gap-2">
                           {daysOfWeek.map((day, index) => (
-                            <motion.button
+                            <m.button
                               key={day}
                               className={`px-3 py-1 rounded-full text-sm ${
                                 filters.eventCriteria.preferredDays.includes(index)
@@ -587,7 +592,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                               aria-pressed={filters.eventCriteria.preferredDays.includes(index)}
                             >
                               {day}
-                            </motion.button>
+                            </m.button>
                           ))}
                         </div>
                       </div>
@@ -611,10 +616,10 @@ const FilterBar: React.FC<FilterBarProps> = ({
                                     filters.eventCriteria.timeRange.endTime
                                   );
                                 }
-                                }
                               }}
                               className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                               aria-label="Start time filter"
+                            />
                           </div>
                           <div>
                             <label className="block text-xs text-gray-500 mb-1">End Time</label>
@@ -746,7 +751,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                         </h4>
                         <div className="flex flex-wrap gap-2">
                           {Object.entries(PAYMENT_STATUS_TYPES).map(([key, value]) => (
-                            <motion.button
+                            <m.button
                               key={value}
                               className={`px-3 py-1 rounded-full text-sm ${
                                 filters.eventCriteria.paymentStatus.includes(value)
@@ -767,10 +772,11 @@ const FilterBar: React.FC<FilterBarProps> = ({
                               aria-label={`Filter by ${key.toLowerCase()} payment status`}
                             >
                               {key.charAt(0) + key.slice(1).toLowerCase()}
-                            </motion.button>
+                            </m.button>
+                          ))}
                         </div>
                       </div>
-                    </motion.div>
+                    </m.div>
                   </TabsContent>
                 </Tabs>
                 {/* Reset Filters Button */}
@@ -795,13 +801,13 @@ const FilterBar: React.FC<FilterBarProps> = ({
                     Reset All Filters
                   </Button>
                 </div>
-              </motion.div>
+              </m.div>
             )}
           </AnimatePresence>
 
           {/* Loading Overlay */}
           {isLoading && (
-            <motion.div 
+            <m.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -813,11 +819,11 @@ const FilterBar: React.FC<FilterBarProps> = ({
                 <Spinner size="lg" className="mb-2" />
                 <p className="text-sm text-gray-600">Updating filters...</p>
               </div>
-            </motion.div>
+            </m.div>
           )}
         </CardContent>
       </Card>
-    </AnimatedContainer>
+    </m.div>
   );
 };
 

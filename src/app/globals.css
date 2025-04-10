@@ -1,3 +1,18 @@
+/* Add custom toast styling overrides */
+:root {
+  --toaster-z-index: 9999;
+}
+
+/* Toast styles */
+.sonner-toast {
+  @apply border border-gray-200 dark:border-gray-700;
+}
+
+/* Dark mode toast styles */
+html.dark .sonner-toast {
+  @apply bg-gray-800 text-white;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

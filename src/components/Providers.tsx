@@ -2,6 +2,7 @@
 
 import { ReactNode, createContext, useState, useContext } from 'react';
 import { SessionProvider } from 'next-auth/react';
+import { Toaster, toast } from 'sonner';
 
 /**
  * Calendar Context Types
@@ -59,23 +60,75 @@ const CalendarProvider = ({ children }: { children: ReactNode }) => {
   const [filteredTypes, setFilteredTypes] = useState<EventType[]>([]);
 
   const addEvent = (event: CalendarEvent) => {
-    setEvents([...events, event]);
+    try {
+      // Here you would typically make an API call to persist the event
+      // For now, we're just updating the local state
+      setEvents([...events, event]);
+      toast.success('Event added successfully', {
+        description: `${event.title} has been added to your calendar.`
+      });
+    } catch (error) {
+      toast.error('Failed to add event', {
+        description: error instanceof Error ? error.message : 'An unknown error occurred'
+      });
+    }
   };
 
   const updateEvent = (updatedEvent: CalendarEvent) => {
-    setEvents(events.map(event => 
-      event.id === updatedEvent.id ? updatedEvent : event
-    ));
+    try {
+      // Here you would typically make an API call to update the event
+      setEvents(events.map(event => 
+        event.id === updatedEvent.id ? updatedEvent : event
+      ));
+      toast.success('Event updated successfully', {
+        description: `Changes to "${updatedEvent.title}" have been saved.`
+      });
+    } catch (error) {
+      toast.error('Failed to update event', {
+        description: error instanceof Error ? error.message : 'An unknown error occurred'
+      });
+    }
   };
 
   const deleteEvent = (eventId: string) => {
-    setEvents(events.filter(event => event.id !== eventId));
+    try {
+      // Find the event title before removing it to use in the success message
+      const eventToDelete = events.find(event => event.id === eventId);
+      
+      // Here you would typically make an API call to delete the event
+      setEvents(events.filter(event => event.id !== eventId));
+      
+      if (eventToDelete) {
+        toast.success('Event deleted', {
+          description: `"${eventToDelete.title}" has been removed from your calendar.`
+        });
+      }
+    } catch (error) {
+      toast.error('Failed to delete event', {
+        description: error instanceof Error ? error.message : 'An unknown error occurred'
+      });
+    }
   };
 
   const joinEvent = (eventId: string) => {
-    setEvents(events.map(event => 
-      event.id === eventId ? { ...event, hasJoined: true } : event
-    ));
+    try {
+      const eventToJoin = events.find(event => event.id === eventId);
+      
+      // Here you would typically make an API call to register for the event
+      setEvents(events.map(event => 
+        event.id === eventId ? { ...event, hasJoined: true } : event
+      ));
+      
+      if (eventToJoin) {
+        toast.success('Successfully joined event', {
+          description: `You've registered for "${eventToJoin.title}".`
+        });
+      }
+    } catch (error) {
+      toast.error('Failed to join event', {
+        description: error instanceof Error ? error.message : 'An unknown error occurred'
+      });
+    }
   };
 
   return (
@@ -116,10 +169,19 @@ interface ProvidersProps {
  */
 export default function Providers({ children }: ProvidersProps) {
   return (
-    <SessionProvider>
-      <CalendarProvider>
-        {children}
-      </CalendarProvider>
-    </SessionProvider>
+    <>
+      <SessionProvider>
+        <CalendarProvider>
+          {children}
+        </CalendarProvider>
+      </SessionProvider>
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          className: 'rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-lg',
+        }}
+      />
+    </>
   );
 }
