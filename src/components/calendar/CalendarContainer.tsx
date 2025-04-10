@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Calendar } from './Calendar';
 import { MapView } from './MapView';
 import FilterBar from './FilterBar';
@@ -15,6 +15,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useCalendarEvents } from './hooks/useCalendarEvents';
 import { useEventFilters } from './hooks/useEventFilters';
 import { FilterState, DEFAULT_FILTER_STATE } from '@/types/filters';
+import { KafkaService } from '@/lib/services/kafkaService';
+import { KAFKA_TOPICS } from '@/lib/config/kafka';
 
 // Component props
 interface CalendarContainerProps {
@@ -36,7 +38,6 @@ const ErrorFallback = ({ error, resetErrorBoundary }) => (
     </AlertDescription>
   </Alert>
 );
-
 const CalendarContainer: React.FC<CalendarContainerProps> = ({
   initialEvents = [],
   onEventSelect,
@@ -44,6 +45,9 @@ const CalendarContainer: React.FC<CalendarContainerProps> = ({
 }) => {
   const { toast } = useToast();
   const { session } = useAuth();
+  
+  // Reference to track if component is mounted to prevent state updates after unmount
+  const isMountedRef = React.useRef(true);
   
   // Initialize the event filters with default filter state
   const {
@@ -103,46 +107,265 @@ const CalendarContainer: React.FC<CalendarContainerProps> = ({
       instructorId: event.createdBy,
     }));
   }, [filteredEvents]);
-
-  // Handle event selection from calendar
-  const handleCalendarEventSelect = (timeSlot) => {
-    const selectedEvent = getEventById(timeSlot.id);
-    if (selectedEvent && onEventSelect) {
-      onEventSelect(selectedEvent);
-    }
-  };
-
-  // Handle event selection from map
-  const handleMapMarkerSelect = (timeSlot) => {
-    const selectedEvent = getEventById(timeSlot.id);
-    if (selectedEvent && onEventSelect) {
-      onEventSelect(selectedEvent);
-    }
-  };
-
+  // Track events that are in the process of being joined
+  const [joiningEvents, setJoiningEvents] = useState<Set<string>>(new Set());
+  
+  // Get Kafka service instance
+  const kafkaService = useMemo(() => KafkaService.getInstance(), []);
+  
   // Handle user joining an event
-  const handleJoinEvent = async (timeSlotId) => {
-    try {
-      // We need to implement this functionality
+  // Define types for Kafka message handling
+  interface CalendarEventMessage {
+    type: string;
+    data: {
+      action: 'created' | 'updated' | 'deleted' | 'joined';
+      eventId: string;
+      userId?: string;
+      payload: any;
+    };
+  }
+  
+  interface EventRegistrationResponse {
+    success: boolean;
+    message: string;
+    registrationId?: string;
+    requiresPayment?: boolean;
+  }
+  
+  // Handle user joining an event with proper error handling and UI feedback
+  const handleJoinEvent = useCallback(async (timeSlotId: string) => {
+    // Check if already joining this event
+    if (joiningEvents.has(timeSlotId)) {
       toast({
-        title: "Joining Event",
-        description: "This functionality is not yet implemented.",
+        title: "Already Processing",
+        description: "Your request to join this event is already being processed.",
+        variant: "default",
       });
-    } catch (error) {
-      console.error('Error joining event:', error);
+      return;
+    }
+    
+    // Check authentication
+    if (!session?.user) {
       toast({
-        title: "Error",
-        description: "Failed to join event. Please try again.",
+        title: "Authentication Required",
+        description: "Please sign in to join events.",
         variant: "destructive",
       });
+      return;
     }
-  };
-
-  // Refresh events on mount
+    
+    try {
+      // Mark this event as currently being joined
+      setJoiningEvents(prev => new Set([...prev, timeSlotId]));
+      
+      // Get event details
+      const event = getEventById(timeSlotId);
+      if (!event) {
+        throw new Error("Event not found");
+      }
+      
+      // Check if event is at capacity
+      if (event.capacity && event.participants?.length >= event.capacity) {
+        throw new Error("This event is already at full capacity");
+      }
+      
+      // Check if user has already joined
+      if (event.isJoined) {
+        toast({
+          title: "Already Joined",
+          description: "You have already joined this event.",
+          variant: "default",
+        });
+        setJoiningEvents(prev => {
+          const updated = new Set(prev);
+          updated.delete(timeSlotId);
+          return updated;
+        });
+        return;
+      }
+      
+      // Display joining toast
+      toast({
+        title: "Joining Event",
+        description: "Processing your request to join this event...",
+      });
+      
+      // Make API call to join the event
+      const response = await fetch('/api/calendar/participants', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          eventId: timeSlotId,
+          userId: session.user.id,
+        }),
+      });
+      
+      // Check response
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to join event');
+      }
+      
+      const responseData: EventRegistrationResponse = await response.json();
+      
+      // Handle payment requirement if event is paid
+      if (event.price > 0 && responseData.requiresPayment) {
+        // Redirect to payment page if this event requires payment
+        window.location.href = `/calendar/payment?eventId=${timeSlotId}&registrationId=${responseData.registrationId}`;
+        return;
+      }
+      
+      // Optimistically update the local event state
+      const updatedEvent = {
+        ...event,
+        isJoined: true,
+        participants: [...(event.participants || []), session.user.id],
+      };
+      
+      // Update the event in cache or state
+      updateEvent(updatedEvent);
+      
+      // Publish the join event to Kafka for real-time updates
+      try {
+        const joinMessage = kafkaService.createCalendarEventMessage(
+          timeSlotId,
+          'joined',
+          {
+            userId: session.user.id,
+            joinedAt: new Date().toISOString(),
+            eventDetails: {
+              title: event.title,
+              startTime: event.startTime,
+              isPaid: event.price > 0,
+            },
+          },
+          session.user.id
+        );
+        
+        // Publish message asynchronously - don't await this to avoid blocking the UI
+        kafkaService.publishMessage(KAFKA_TOPICS.CALENDAR_EVENTS, joinMessage)
+          .catch(error => {
+            console.error('Failed to publish join event to Kafka:', error);
+            // Non-critical error, don't show to user
+          });
+      } catch (kafkaError) {
+        console.error('Error creating Kafka message for join event:', kafkaError);
+        // Non-critical, don't block UI or show error to user
+      }
+      
+      // Show success toast
+      toast({
+        title: "Success!",
+        description: `You have successfully joined "${event.title}"`,
+        variant: "default",
+      });
+      
+      // Refresh events to get the latest data
+      refresh();
+      
+    } catch (error: any) { // Explicitly type error as 'any'
+      console.error('Error joining event:', error);
+      
+      // Handle different types of errors
+      let errorMessage = "Failed to join event. Please try again.";
+      
+      if (error.message === "Event not found") {
+        errorMessage = "This event no longer exists or has been removed.";
+      } else if (error.message === "This event is already at full capacity") {
+        errorMessage = "Sorry, this event is now full. Please try another event.";
+      } else if (error.message?.includes("network")) {
+        errorMessage = "Network error. Please check your connection and try again.";
+      } else if (error.message?.includes("unauthorized") || error.message?.includes("authentication")) {
+        errorMessage = "Your session has expired. Please sign in again to join events.";
+      }
+      
+      // Show error toast
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      // Remove this event from the joining set
+      setJoiningEvents(prev => {
+        const updated = new Set(prev);
+        updated.delete(timeSlotId);
+        return updated;
+      });
+    }
+  }, [joiningEvents, session, getEventById, toast, kafkaService, updateEvent, refresh]);
+  // Refresh events on mount and handle cleanup
   useEffect(() => {
     refresh();
+    
+    // Set mounted ref for cleanup
+    return () => {
+      isMountedRef.current = false;
+    };
   }, [refresh]);
-
+  
+  // Set up Kafka subscription for real-time updates
+  useEffect(() => {
+    // Don't set up subscription if no user is logged in
+    if (!session?.user?.id) return;
+    
+    // Subscribe to relevant Kafka topics for real-time updates
+    let unsubscribe: (() => Promise<void>) | null = null;
+    
+    const setupSubscription = async () => {
+      try {
+        // Subscribe to relevant topics
+        unsubscribe = await kafkaService.subscribeToTopics(
+          [KAFKA_TOPICS.CALENDAR_EVENTS, KAFKA_TOPICS.CALENDAR_UPDATES],
+          handleKafkaMessage
+        );
+        console.log('Subscribed to Kafka calendar topics');
+      } catch (error) {
+        console.error('Failed to subscribe to Kafka topics:', error);
+      }
+    };
+    
+    setupSubscription();
+    
+    // Cleanup function to unsubscribe
+    return () => {
+      if (unsubscribe) {
+        unsubscribe().catch(error => {
+          console.error('Error unsubscribing from Kafka:', error);
+        });
+      }
+    };
+  }, [session?.user?.id]);
+  
+  // Handle Kafka messages for real-time updates
+  const handleKafkaMessage = useCallback((message: CalendarEventMessage) => {
+    // Skip if component unmounted
+    if (!isMountedRef.current) return;
+    
+    console.log('Received Kafka message:', message);
+    
+    // Handle different types of messages
+    if (message.type === 'CALENDAR_EVENTS') {
+      const { action, eventId, userId, payload } = message.data;
+      
+      // Only process messages relevant to this user
+      if (userId === session?.user?.id || action === 'created' || action === 'updated' || action === 'deleted') {
+        refresh();
+      }
+      
+      // Handle join confirmations specifically
+      if (action === 'joined' && userId === session?.user?.id) {
+        // Show confirmation toast if it's a join confirmation for this user
+        toast({
+          title: "Join Confirmed",
+          description: `Your registration for ${payload?.eventDetails?.title || 'the event'} has been confirmed.`,
+          variant: "default",
+        });
+      }
+    }
+  }, [session?.user?.id, refresh, toast]);
   // Main render
   return (
     <ErrorBoundary FallbackComponent={ErrorFallback} onReset={refresh}>
@@ -188,12 +411,6 @@ const CalendarContainer: React.FC<CalendarContainerProps> = ({
                 </button>
               </AlertDescription>
             </Alert>
-          )}
-          
-          {/* Calendar and Map View Grid */}
-          {!loading && !error && (
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              <Card className="p-4 xl:col-span-2">
                 <h2 className="text-xl font-bold mb-4">Calendar</h2>
                 <Calendar 
                   initialTimeSlots={calendarTimeSlots}
@@ -202,6 +419,7 @@ const CalendarContainer: React.FC<CalendarContainerProps> = ({
                   onTimeSlotDeleted={deleteEvent}
                   onUserJoinTimeSlot={handleJoinEvent}
                   onSelectEvent={handleCalendarEventSelect}
+                  disabledJoinIds={Array.from(joiningEvents)} // Pass joining events for UI feedback
                 />
               </Card>
               
@@ -214,9 +432,9 @@ const CalendarContainer: React.FC<CalendarContainerProps> = ({
                   onTimeSlotSelected={handleMapMarkerSelect}
                   onUserJoinTimeSlot={handleJoinEvent}
                   availableLocations={availableLocations}
+                  disabledJoinIds={Array.from(joiningEvents)} // Pass joining events for UI feedback
                 />
               </Card>
-            </div>
           )}
         </div>
       </Container>
